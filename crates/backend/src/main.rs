@@ -1,3 +1,5 @@
+use axum::http::HeaderValue;
+use axum::http::Method;
 use axum::{routing::get, routing::post, Router};
 use pickando_backend::{init_sample_routes, routes, state, ws};
 use std::sync::Arc;
@@ -12,7 +14,7 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::from_default_env().add_directive("pickando=info".parse().unwrap()),
+            EnvFilter::from_default_env().add_directive("pickando=info".parse().expect("invalid log filter directive")),
         )
         .init();
 
@@ -31,14 +33,23 @@ async fn main() {
         .route("/api/v1/health", get(routes::health_check))
         .route("/api/v1/routes", get(routes::list_routes))
         .route("/api/v1/routes", post(routes::create_route))
+        .route("/api/v1/routes/{id}/join", post(routes::join_route))
         .route("/api/v1/match", post(routes::find_matches))
         .route("/ws", get(ws::ws_handler))
         .with_state(state.clone());
 
+    let origin = std::env::var("CORS_ORIGIN")
+        .unwrap_or_else(|_| "https://pickando-demo-production.up.railway.app".to_string());
+
+    let cors = CorsLayer::new()
+        .allow_origin(origin.parse::<HeaderValue>().unwrap_or_else(|_| "http://localhost:3000".parse().unwrap()))
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([axum::http::header::CONTENT_TYPE]);
+
     let app = Router::new()
         .merge(api_routes)
         .fallback_service(ServeDir::new(&static_dir).append_index_html_on_directories(true))
-        .layer(CorsLayer::permissive());
+        .layer(cors);
 
     let addr = format!("0.0.0.0:{port}");
     tracing::info!("Pickando Backend starting on http://{addr}");
@@ -46,6 +57,6 @@ async fn main() {
     tracing::info!("WebSocket: ws://{addr}/ws");
     tracing::info!("Static files: {static_dir}");
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr).await.expect("failed to bind TCP listener");
+    axum::serve(listener, app).await.expect("server error");
 }
