@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
-/// Driver dashboard page.
+/// Driver page — Conversational route publishing flow.
+/// "Salgo de [Input] hacia [Input] a las [Input] y tengo [Selector] asientos"
 #[component]
 pub fn DriverPage() -> Element {
     let mut origin = use_signal(|| String::from("Zocalo, CDMX"));
@@ -12,72 +13,77 @@ pub fn DriverPage() -> Element {
     rsx! {
         section { class: "page-section",
             div { class: "page-header",
-                h1 { "Panel del Conductor" }
+                h1 { "Publicar Ruta" }
                 p { class: "page-subtitle",
                     "Publica tu ruta y recibe pasajeros que van en tu misma dirección"
                 }
             }
 
             if !published() {
-                div { class: "driver-form card",
-                    h2 { "Publicar Nueva Ruta" }
+                // ===== CONVERSATIONAL FLOW =====
+                div { class: "publish-flow",
+                    div { class: "publish-flow-header",
+                        h2 { "Cuéntanos tu ruta" }
+                        p { "Completa la frase para publicar tu viaje en segundos" }
+                    }
 
-                    div { class: "form-group",
-                        label { "Origen" }
+                    div { class: "convo-sentence",
+                        span { class: "convo-label", "Salgo de " }
                         input {
+                            class: "convo-inline-input",
                             r#type: "text",
                             value: "{origin}",
                             oninput: move |e| origin.set(e.value()),
-                            placeholder: "Dirección de origen",
+                            placeholder: "Origen",
                         }
-                    }
-
-                    div { class: "form-group",
-                        label { "Destino" }
+                        span { class: "convo-label", " hacia " }
                         input {
+                            class: "convo-inline-input",
                             r#type: "text",
                             value: "{dest}",
                             oninput: move |e| dest.set(e.value()),
-                            placeholder: "Dirección de destino",
+                            placeholder: "Destino",
                         }
-                    }
-
-                    div { class: "form-row",
-                        div { class: "form-group",
-                            label { "Asientos disponibles" }
-                            input {
-                                r#type: "number",
-                                value: "{seats}",
-                                oninput: move |e| seats.set(e.value()),
-                                min: "1",
-                                max: "6",
-                            }
+                        br {}
+                        span { class: "convo-label", "a las " }
+                        input {
+                            class: "convo-inline-input",
+                            r#type: "time",
+                            value: "{time}",
+                            oninput: move |e| time.set(e.value()),
+                            style: "max-width: 110px;",
                         }
-                        div { class: "form-group",
-                            label { "Hora de salida" }
-                            input {
-                                r#type: "time",
-                                value: "{time}",
-                                oninput: move |e| time.set(e.value()),
-                            }
+                        span { class: "convo-label", " y tengo " }
+                        select {
+                            class: "convo-inline-select",
+                            value: "{seats}",
+                            onchange: move |e| seats.set(e.value()),
+                            option { value: "1", "1" }
+                            option { value: "2", "2" }
+                            option { value: "3", "3" }
+                            option { value: "4", "4" }
+                            option { value: "5", "5" }
+                            option { value: "6", "6" }
                         }
+                        span { class: "convo-label", " asientos" }
                     }
 
                     button {
-                        class: "btn-primary btn-lg",
+                        class: "convo-publish-btn",
                         onclick: move |_| published.set(true),
                         "Publicar Ruta"
                     }
 
                     p { class: "form-note",
-                        "TODO M2: Conexión real al backend — POST /api/v1/routes"
+                        "TODO M2: POST /api/v1/routes — Conexión real al backend"
                     }
                 }
             } else {
-                div { class: "success-card card",
-                    div { class: "success-icon", "✓" }
-                    h2 { "Ruta Publicada!" }
-                    p { "Tu ruta ha sido publicada y está visible para pasajeros cercanos." }
+                // ===== PUBLISHED CONFIRMATION =====
+                div { class: "publish-confirmation",
+                    div { class: "confirm-icon", "✓" }
+                    h3 { "Ruta Publicada" }
+                    p { "Tu ruta está visible para pasajeros cercanos" }
                     div { class: "route-summary",
                         div { class: "summary-row",
                             span { class: "label", "Origen" }
@@ -88,25 +94,26 @@ pub fn DriverPage() -> Element {
                             span { class: "value", "{dest}" }
                         }
                         div { class: "summary-row",
-                            span { class: "label", "Asientos" }
-                            span { class: "value", "{seats}" }
-                        }
-                        div { class: "summary-row",
                             span { class: "label", "Salida" }
                             span { class: "value", "{time}" }
                         }
+                        div { class: "summary-row",
+                            span { class: "label", "Asientos" }
+                            span { class: "value", "{seats}" }
+                        }
                     }
                     button {
-                        class: "btn-secondary",
+                        class: "btn-reset",
                         onclick: move |_| published.set(false),
                         "Publicar otra ruta"
                     }
                 }
 
+                // Pending requests placeholder
                 div { class: "card",
                     h3 { "Solicitudes de Pasajeros" }
                     p { class: "placeholder-text",
-                        "Cuando un pasajero solicite unirse a tu ruta, aparecerá aquí."
+                        "Cuando un pasajero solicite unirse, aparecerá aquí."
                     }
                     div { class: "placeholder-list",
                         div { class: "placeholder-item",

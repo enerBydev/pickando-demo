@@ -1,7 +1,7 @@
+use crate::Page;
 use dioxus::prelude::*;
 
-use crate::Page;
-
+/// Navbar — minimal dark, functional navigation.
 #[component]
 pub fn Navbar(active_page: Page, on_navigate: EventHandler<Page>) -> Element {
     let mut mobile_open = use_signal(|| false);

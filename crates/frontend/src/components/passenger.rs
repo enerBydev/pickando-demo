@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use pickando_shared::models::{MatchRequest, MatchResult, Route};
 
-/// Passenger search page — the core matching feature demo.
+/// Passenger search page — matching with asymmetric route cards.
 #[component]
 pub fn PassengerPage() -> Element {
     let mut lat = use_signal(|| String::from("19.4326"));
@@ -26,26 +26,26 @@ pub fn PassengerPage() -> Element {
                 button {
                     class: if active_tab() == 0 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(0),
-                    "Buscar Matches"
+                    "Matches"
                 }
                 button {
                     class: if active_tab() == 1 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(1),
-                    "Rutas Disponibles"
+                    "Rutas"
                 }
                 button {
                     class: if active_tab() == 2 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(2),
-                    "Status del Sistema"
+                    "Sistema"
                 }
             }
 
             // Tab 0: Matching
             if active_tab() == 0 {
-                div { class: "card",
+                div { class: "search-card",
                     h2 { "Búsqueda por Ubicación" }
                     p { class: "form-note",
-                        "POST /api/v1/match — Motor de matching con Geohash + Haversine en Rust puro"
+                        "POST /api/v1/match — Geohash + Haversine en Rust puro"
                     }
 
                     div { class: "form-row",
@@ -68,7 +68,7 @@ pub fn PassengerPage() -> Element {
                     }
 
                     div { class: "form-group",
-                        label { "Radio de búsqueda (km)" }
+                        label { "Radio (km)" }
                         input {
                             r#type: "text",
                             value: "{radius}",
@@ -104,38 +104,40 @@ pub fn PassengerPage() -> Element {
                     }
 
                     if !matches().is_empty() {
-                        div { class: "results-section",
-                            h3 { "Matches Encontrados ({matches().len()})" }
+                        div { class: "routes-section",
+                            div { class: "routes-section-header",
+                                h2 { "Viajes Disponibles" }
+                                span { class: "route-count", "{matches().len()} encontrados" }
+                            }
                             for m in matches() {
-                                div { class: "match-card",
+                                div { class: "route-card-v2",
                                     key: "{m.route.id}",
-                                    div { class: "match-header",
-                                        span { class: "route-id", "{m.route.id}" }
-                                        span { class: "match-distance",
-                                            "{m.distance_km} km"
+                                    // Left: Route visualization
+                                    div { class: "route-card-map",
+                                        div { class: "route-line-visual",
+                                            span { class: "route-dot origin" }
+                                            div { class: "route-line-segment" }
+                                            span { class: "route-dot dest" }
+                                        }
+                                        span { class: "route-distance", "{m.distance_km:.1} km" }
+                                    }
+                                    // Center: Route details
+                                    div { class: "route-card-details",
+                                        span { class: "route-origin", "{m.route.origin_address}" }
+                                        span { class: "route-arrow", "↓" }
+                                        span { class: "route-destination", "{m.route.dest_address}" }
+                                        div { class: "route-meta-row",
+                                            span { class: "departure-time", "● {m.route.departure_time}" }
+                                            span { "{m.route.seats_available} asientos" }
                                         }
                                     }
-                                    div { class: "match-body",
-                                        div { class: "route-point",
-                                            span { class: "point-dot origin" }
-                                            span { "{m.route.origin_address}" }
+                                    // Right: Driver + CTA
+                                    div { class: "route-card-action",
+                                        div { class: "driver-avatar verified",
+                                            "{m.route.driver_id.chars().next().unwrap_or('D')}"
                                         }
-                                        div { class: "route-point",
-                                            span { class: "point-dot dest" }
-                                            span { "{m.route.dest_address}" }
-                                        }
-                                        div { class: "route-meta",
-                                            span { "Salida: {m.route.departure_time}" }
-                                            span { "Asientos: {m.route.seats_available}" }
-                                        }
-                                    }
-                                    div { class: "match-footer",
-                                        span { class: "score",
-                                            "Relevancia: {m.relevance_score}"
-                                        }
-                                        button { class: "btn-sm btn-primary",
-                                            "Solicitar"
-                                        }
+                                        span { class: "driver-verified-badge", "Verificado" }
+                                        button { class: "route-join-btn", "Unirme" }
                                     }
                                 }
                             }
@@ -151,10 +153,10 @@ pub fn PassengerPage() -> Element {
 
             // Tab 1: All routes
             if active_tab() == 1 {
-                div { class: "card",
+                div { class: "search-card",
                     h2 { "Rutas Publicadas" }
                     p { class: "form-note",
-                        "GET /api/v1/routes — Rutas de prueba en backend Rust/Axum"
+                        "GET /api/v1/routes — Rutas de prueba del backend"
                     }
 
                     button {
@@ -174,26 +176,40 @@ pub fn PassengerPage() -> Element {
                     }
 
                     if !all_routes().is_empty() {
-                        div { class: "results-section",
+                        div { class: "routes-section",
+                            div { class: "routes-section-header",
+                                h2 { "Todas las Rutas" }
+                                span { class: "route-count", "{all_routes().len()} publicadas" }
+                            }
                             for r in all_routes() {
-                                div { class: "route-card",
+                                div { class: "route-card-v2",
                                     key: "{r.id}",
-                                    div { class: "route-header",
-                                        span { class: "route-id", "{r.id}" }
-                                        span { class: "seats-badge",
-                                            "{r.seats_available} asientos"
+                                    // Left: Route visualization
+                                    div { class: "route-card-map",
+                                        div { class: "route-line-visual",
+                                            span { class: "route-dot origin" }
+                                            div { class: "route-line-segment" }
+                                            span { class: "route-dot dest" }
                                         }
                                     }
-                                    div { class: "route-body",
-                                        div { class: "route-point",
-                                            span { class: "point-dot origin" }
-                                            span { "{r.origin_address}" }
+                                    // Center: Route details
+                                    div { class: "route-card-details",
+                                        span { class: "route-origin", "{r.origin_address}" }
+                                        span { class: "route-arrow", "↓" }
+                                        span { class: "route-destination", "{r.dest_address}" }
+                                        div { class: "route-meta-row",
+                                            span { class: "departure-time", "● {r.departure_time}" }
+                                            span { "{r.seats_available} asientos" }
+                                            span { class: "seats-badge", "{r.geohash}" }
                                         }
-                                        div { class: "route-point",
-                                            span { class: "point-dot dest" }
-                                            span { "{r.dest_address}" }
+                                    }
+                                    // Right: Driver + CTA
+                                    div { class: "route-card-action",
+                                        div { class: "driver-avatar verified",
+                                            "{r.driver_id.chars().next().unwrap_or('D')}"
                                         }
-                                        p { class: "route-time", "Salida: {r.departure_time}" }
+                                        span { class: "driver-verified-badge", "Verificado" }
+                                        button { class: "route-join-btn", "Unirme" }
                                     }
                                 }
                             }
@@ -204,10 +220,10 @@ pub fn PassengerPage() -> Element {
 
             // Tab 2: System Status
             if active_tab() == 2 {
-                div { class: "card",
+                div { class: "search-card",
                     h2 { "Status del Sistema" }
                     p { class: "form-note",
-                        "GET /api/v1/health — Health check del backend Rust/Axum"
+                        "GET /api/v1/health — Health check del backend"
                     }
 
                     {rsx! { HealthChecker {} }}
@@ -223,11 +239,11 @@ pub fn PassengerPage() -> Element {
                         }
                         div { class: "tech-item",
                             span { class: "tech-name", "Database" }
-                            span { class: "tech-value", "PostgreSQL (TODO M2)" }
+                            span { class: "tech-value", "PostgreSQL (TODO)" }
                         }
                         div { class: "tech-item",
                             span { class: "tech-name", "Cache" }
-                            span { class: "tech-value", "Redis (TODO M2)" }
+                            span { class: "tech-value", "Redis (TODO)" }
                         }
                         div { class: "tech-item",
                             span { class: "tech-name", "Matching" }
@@ -242,7 +258,7 @@ pub fn PassengerPage() -> Element {
                             span { class: "tech-value", "Railway" }
                         }
                         div { class: "tech-item",
-                            span { class: "tech-name", "Lenguaje" }
+                            span { class: "tech-name", "Language" }
                             span { class: "tech-value", "Rust 1.96" }
                         }
                     }
