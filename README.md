@@ -3,6 +3,8 @@
 > **Proof of execution** — no es MVP, no es M1, es el esqueleto andando.  
 > Demuestra que Rust + Dioxus compila a WASM, Axum sirve API, y el matching funciona.
 
+🌐 **Demo en vivo**: [pickando-demo-production.up.railway.app](https://pickando-demo-production.up.railway.app/)
+
 ---
 
 ## Stack Tecnológico
@@ -93,7 +95,7 @@ docker run -p 3000:3000 pickando-demo
 ### Ejemplo: Health Check
 
 ```bash
-curl https://pickando-demo.up.railway.app/api/v1/health
+curl https://pickando-demo-production.up.railway.app/api/v1/health
 ```
 
 ```json
@@ -109,7 +111,7 @@ curl https://pickando-demo.up.railway.app/api/v1/health
 ### Ejemplo: Matching
 
 ```bash
-curl -X POST https://pickando-demo.up.railway.app/api/v1/match \
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/match \
   -H "Content-Type: application/json" \
   -d '{"lat": 19.4326, "lng": -99.1332, "radius_km": 5}'
 ```
@@ -117,7 +119,7 @@ curl -X POST https://pickando-demo.up.railway.app/api/v1/match \
 ### Ejemplo: WebSocket
 
 ```bash
-wscat -c wss://pickando-demo.up.railway.app/ws
+wscat -c wss://pickando-demo-production.up.railway.app/ws
 # Envia cualquier mensaje y recibirás echo + confirmación
 ```
 

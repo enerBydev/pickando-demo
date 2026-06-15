@@ -1,7 +1,7 @@
 use crate::Page;
 use dioxus::prelude::*;
 
-/// Landing page — Hero with Quick Action Widget, stats, features, architecture.
+/// Landing page — User-first hero, asymmetric layout, anti-generic.
 #[component]
 pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
     let mut origin = use_signal(String::new);
@@ -10,32 +10,50 @@ pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
 
     rsx! {
         section { class: "landing visible",
-            // ===== HERO =====
+            // ===== HERO — Dominant, user-first =====
             div { class: "hero",
                 div { class: "hero-content",
-                    // Left: Bold value prop
+                    // Left: Massive value prop — USER BENEFITS, not tech
                     div { class: "hero-left",
-                        div { class: "hero-badge", "MOVILIDAD LOCAL INTELIGENTE" }
+                        div { class: "hero-badge accent-warm-dim",
+                            span { class: "accent-warm", "→" }
+                            " Viaja en tu misma dirección"
+                        }
                         h1 { class: "hero-title",
-                            "Llega más rápido "
+                            "Comparte tu camino. "
                             br {}
-                            "compartiendo tu "
-                            span { class: "highlight", "ruta" }
+                            "Llega más "
+                            span { class: "highlight", "rápido" }
+                            "."
                         }
                         p { class: "hero-subtitle",
-                            "Conecta con alguien que ya va por tu camino. Sin desvíos, \
-                            sin esperar. Solo viajeros en la misma dirección."
+                            "Alguien ya va por tu ruta. Conéctate, comparte el viaje, \
+                            ahorra tiempo y dinero. Sin desvíos, sin esperar — solo viajeros \
+                            en la misma dirección."
+                        }
+                        div { class: "hero-trust-row",
+                            div { class: "trust-chip",
+                                span { class: "trust-icon", "✓" }
+                                " Conductores verificados"
+                            }
+                            div { class: "trust-chip",
+                                span { class: "trust-icon accent-warm", "⚡" }
+                                " Matching en <50ms"
+                            }
+                            div { class: "trust-chip",
+                                span { class: "trust-icon", "🛡" }
+                                " Viajes seguros"
+                            }
                         }
                     }
 
-                    // Right: Quick Action Widget
+                    // Right: Quick Action Widget — the visual anchor
                     div { class: "quick-action-widget",
                         div { class: "qaw-header",
                             span { class: "qaw-title", "Buscar ahora" }
                             div { class: "qaw-live-dot" }
                         }
                         div { class: "qaw-body",
-                            // Origin input
                             div { class: "qaw-input-group",
                                 div { class: "qaw-input-row",
                                     span { class: "qaw-input-dot origin" }
@@ -48,11 +66,7 @@ pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
                                     }
                                 }
                             }
-
-                            // Connector line
                             div { class: "qaw-connector" }
-
-                            // Destination input
                             div { class: "qaw-input-group",
                                 div { class: "qaw-input-row",
                                     span { class: "qaw-input-dot dest" }
@@ -65,8 +79,6 @@ pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
                                     }
                                 }
                             }
-
-                            // Role selector
                             div { class: "qaw-role-selector",
                                 button {
                                     class: if role() == "passenger" { "qaw-role-btn active" } else { "qaw-role-btn" },
@@ -79,8 +91,6 @@ pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
                                     "Quiero Conducir"
                                 }
                             }
-
-                            // Search CTA
                             button {
                                 class: "qaw-search-btn",
                                 onclick: move |_| {
@@ -97,67 +107,53 @@ pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
                 }
             }
 
-            // ===== STATS STRIP =====
-            div { class: "stats-strip",
-                div { class: "stat-item",
-                    span { class: "stat-number", "100%" }
-                    span { class: "stat-label", "Rust" }
+            // ===== ASYMMETRIC FEATURE STRIP — varied sizes, user-benefit copy =====
+            div { class: "features-asymmetric",
+                div { class: "feature-wide",
+                    div { class: "feature-inner",
+                        div { class: "feature-eyebrow", "PASAJERO" }
+                        h3 { "Encuentra tu viaje en segundos" }
+                        p { "Ingresa tu origen y destino. Nuestro motor de matching encuentra \
+                        conductores que van en tu misma dirección, con asientos disponibles, \
+                        en tiempo real. Sin buscarte una parada, sin esperar rutas." }
+                        button {
+                            class: "feature-cta",
+                            onclick: move |_| on_navigate.call(Page::Passenger),
+                            "Buscar viaje →"
+                        }
+                    }
                 }
-                div { class: "stat-item",
-                    span { class: "stat-number", "<50ms" }
-                    span { class: "stat-label", "Matching" }
+                div { class: "feature-tall",
+                    div { class: "feature-inner",
+                        div { class: "feature-eyebrow accent-warm", "CONDUCTOR" }
+                        h3 { "Publica y recibe pasajeros" }
+                        p { "¿Ya vas para allá? Publica tu ruta en 10 segundos y recibe \
+                        pasajeros que van en tu misma dirección. Gasolina compartida, \
+                        camino más ameno." }
+                        button {
+                            class: "feature-cta accent-warm-bg",
+                            onclick: move |_| on_navigate.call(Page::Driver),
+                            "Publicar ruta →"
+                        }
+                    }
                 }
-                div { class: "stat-item",
-                    span { class: "stat-number", "4" }
-                    span { class: "stat-label", "Plataformas" }
+                div { class: "feature-small",
+                    div { class: "feature-inner",
+                        span { class: "feature-stat", "<50ms" }
+                        span { class: "feature-stat-label", "Matching en tiempo real" }
+                        p { "Geohash + Haversine: Rust puro, sin latencia" }
+                    }
                 }
-                div { class: "stat-item",
-                    span { class: "stat-number", "0" }
-                    span { class: "stat-label", "Costo demo" }
-                }
-            }
-
-            // ===== FEATURES =====
-            div { class: "features",
-                div { class: "feature-card",
-                    div { class: "feature-icon", "🧭" }
-                    h3 { "Matching Inteligente" }
-                    p { "Geohash + Haversine en Rust puro. Encuentra conductores dentro de tu radio que van en tu misma dirección." }
-                    span { class: "feature-tag", "Funcional" }
-                }
-                div { class: "feature-card",
-                    div { class: "feature-icon", "⚡" }
-                    h3 { "Tiempo Real" }
-                    p { "WebSocket bidireccional para tracking GPS en vivo. Conexión persistente, latencia mínima." }
-                    span { class: "feature-tag", "Funcional" }
-                }
-                div { class: "feature-card",
-                    div { class: "feature-icon", "🖥️" }
-                    h3 { "Multi-Plataforma" }
-                    p { "Un solo codebase compila a Web WASM, Linux, Windows, Android. Todo desde Rust." }
-                    span { class: "feature-tag", "Funcional" }
-                }
-                div { class: "feature-card",
-                    div { class: "feature-icon", "🔒" }
-                    h3 { "Seguro" }
-                    p { "Verificación de identidad, contactos de confianza, botón SOS. Tu seguridad primero." }
-                    span { class: "feature-tag placeholder", "TODO M3" }
-                }
-                div { class: "feature-card",
-                    div { class: "feature-icon", "💳" }
-                    h3 { "Pagos Integrados" }
-                    p { "Stripe y MercadoPago. Paga desde la app, sin efectivo, sin complicaciones." }
-                    span { class: "feature-tag placeholder", "TODO M3" }
-                }
-                div { class: "feature-card",
-                    div { class: "feature-icon", "⭐" }
-                    h3 { "Calificaciones" }
-                    p { "Sistema de reputación bidireccional. Conductores y pasajeros se califican mutuamente." }
-                    span { class: "feature-tag placeholder", "TODO M3" }
+                div { class: "feature-small",
+                    div { class: "feature-inner",
+                        span { class: "feature-stat accent-warm", "4" }
+                        span { class: "feature-stat-label", "Plataformas" }
+                        p { "Web, Linux, Windows, Android — un solo codebase" }
+                    }
                 }
             }
 
-            // ===== ARCHITECTURE =====
+            // ===== ARCHITECTURE — compact, below fold =====
             div { class: "architecture-section",
                 h2 { class: "section-title", "Arquitectura" }
                 p { class: "section-subtitle",
