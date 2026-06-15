@@ -1,0 +1,145 @@
+name: Release — Multi-Platform Builds
+
+on:
+  push:
+    tags: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    name: Build Linux x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build backend (Linux)
+        run: cargo build --release -p pickando-backend
+
+      - name: Package release
+        run: |
+          mkdir -p release
+          cp target/release/pickando-backend release/pickando-backend-linux-x86_64
+          chmod +x release/pickando-backend-linux-x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pickando-linux-x86_64
+          path: release/pickando-backend-linux-x86_64
+
+  build-windows:
+    name: Build Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build backend (Windows)
+        run: cargo build --release -p pickando-backend
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pickando-windows-x86_64
+          path: target/release/pickando-backend.exe
+
+  build-web:
+    name: Build Web (WASM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install Dioxus CLI
+        run: cargo install dioxus-cli --version 0.7.9
+
+      - name: Build frontend (Web)
+        run: cd crates/frontend && dx build --platform web --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pickando-web
+          path: crates/frontend/dist/
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Android targets
+        run: |
+          rustup target add aarch64-linux-android
+          rustup target add x86_64-linux-android
+
+      - name: Install Dioxus CLI
+        run: cargo install dioxus-cli --version 0.7.9
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android
+        run: cd crates/frontend && dx android build --release
+        continue-on-error: true  # Android build requires extra setup
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pickando-android
+          path: crates/frontend/target/android/**/*.apk
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-windows, build-web]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Pickando Demo ${{ github.ref_name }}
+          body: |
+            ## Pickando Demo — Same-Direction Local Mobility
+
+            **Stack:** Rust 1.96 + Dioxus 0.7 + Axum 0.8
+
+            ### Downloads
+            - **Linux**: `pickando-linux-x86_64` — Binary for x86_64 Linux
+            - **Windows**: `pickando-windows-x86_64` — Binary for x86_64 Windows
+            - **Web**: `pickando-web` — Static WASM files for web deployment
+            - **Android**: `pickando-android` — APK file (if available)
+
+            ### Quick Start
+            ```bash
+            # Backend
+            ./pickando-backend
+            # API at http://localhost:3000
+
+            # Web frontend
+            # Serve the web/ folder with any HTTP server
+            ```
+
+            ### Endpoints
+            | Method | Path | Description |
+            |--------|------|-------------|
+            | GET | /api/v1/health | Health check |
+            | GET | /api/v1/routes | List sample routes |
+            | POST | /api/v1/routes | Create route (placeholder) |
+            | POST | /api/v1/match | Find matching routes |
+            | GET | /ws | WebSocket echo server |
+          draft: false
+          prerelease: false

@@ -1,0 +1,10 @@
+[package]
+name = "pickando-shared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+geohash = "0.13"
+geo-types = "0.7"

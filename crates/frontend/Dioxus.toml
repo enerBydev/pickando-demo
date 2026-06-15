@@ -1,0 +1,21 @@
+[application]
+name = "Pickando"
+default_platform = "web"
+
+# Asset directory for static files
+asset_dir = "assets"
+
+[web.app]
+title = "Pickando — Same-Direction Local Mobility"
+base_path = "/"
+
+[web.watcher]
+watch_path = ["src", "assets"]
+
+[web.resource]
+style = ["/assets/main.css"]
+
+[bundle]
+identifier = "com.pickando.demo"
+publisher = "enerBydev"
+icon = ["assets/icon.png"]

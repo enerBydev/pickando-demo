@@ -1,0 +1,21 @@
+[package]
+name = "pickando-backend"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "pickando-backend"
+path = "src/main.rs"
+
+[dependencies]
+pickando-shared = { path = "../shared" }
+axum = { version = "0.8", features = ["ws"] }
+tokio = { workspace = true }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures = "0.3"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = "0.15"
+tower = "0.5"

@@ -1,0 +1,30 @@
+# Environment
+.env
+.env.local
+.env.production
+
+# Build artifacts
+/target/
+**/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dioxus
+dist/
+.Dioxus/
+
+# Cargo
+Cargo.lock
+
+# Temp
+*.log
+*.tmp
