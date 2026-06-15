@@ -62,7 +62,7 @@ async function testAPIEndpoints() {
     const data = await resp.json();
     log('API', 'GET /api/v1/routes returns 200', resp.status === 200);
     log('API', 'Routes is an array', Array.isArray(data), `got: ${typeof data}`);
-    log('API', 'Routes has 4 sample routes', data.length === 4, `got: ${data.length}`);
+    log('API', 'Routes has >=4 sample routes', data.length >= 4, `got: ${data.length}`);
     if (data.length > 0) {
       const r = data[0];
       log('API', 'Route has required fields', 

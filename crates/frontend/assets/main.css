@@ -49,12 +49,16 @@
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 }
 
-html { scroll-behavior: smooth; }
+html {
+    scroll-behavior: smooth;
+    background: var(--bg-deep);
+}
 
 body {
     font-family: var(--font);
     background: var(--bg-deep);
     color: var(--text-primary);
+    min-height: 100vh;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

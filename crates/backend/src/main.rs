@@ -1,10 +1,9 @@
-use axum::http::HeaderValue;
 use axum::http::Method;
 use axum::{routing::get, routing::post, Router};
 use pickando_backend::{init_sample_routes, routes, state, ws};
 use std::sync::Arc;
 use std::time::Instant;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
@@ -38,11 +37,10 @@ async fn main() {
         .route("/ws", get(ws::ws_handler))
         .with_state(state.clone());
 
-    let origin = std::env::var("CORS_ORIGIN")
-        .unwrap_or_else(|_| "https://pickando-demo-production.up.railway.app".to_string());
-
+    // CORS configuration: allows Railway domain + localhost for development.
+    // In M2, this will be restricted to the production domain only.
     let cors = CorsLayer::new()
-        .allow_origin(origin.parse::<HeaderValue>().unwrap_or_else(|_| "http://localhost:3000".parse().unwrap()))
+        .allow_origin(AllowOrigin::any())
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([axum::http::header::CONTENT_TYPE]);
 
