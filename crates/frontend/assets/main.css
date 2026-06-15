@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 /* ============================================================
    Pickando — Urban Mobility Redesign
    Anti-generic, product-first, dark-native UX
@@ -27,22 +30,24 @@
     --text-muted: #55556A;
     --accent: #00FF88;
     --accent-hover: #00E67A;
-    --accent-dim: rgba(0, 255, 136, 0.12);
+    --accent-dim: rgba(0, 255, 136, 0.15);
+    --accent-border: rgba(0, 255, 136, 0.3);
     --accent-glow: rgba(0, 255, 136, 0.25);
     --accent-warm: #FF6B2B;
     --accent-warm-hover: #FF8850;
     --accent-warm-dim: rgba(255, 107, 43, 0.12);
     --danger: #FF4466;
+    --danger-dim: rgba(255, 68, 102, 0.1);
+    --danger-border: rgba(255, 68, 102, 0.3);
+    --danger-text: #FF8899;
     --verified: #00FF88;
     --warning: #FFB020;
+    --warning-dim: rgba(255, 176, 32, 0.12);
     --radius: 4px;
     --transition: 0.15s ease;
     --font: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 }
-
-/* --- Google Fonts: Space Grotesk (geometric sans-serif) --- */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 html { scroll-behavior: smooth; }
 
@@ -842,6 +847,14 @@ input, select, button, textarea {
     color: var(--bg-deep);
 }
 
+.route-join-btn.joined {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    cursor: default;
+    opacity: 0.8;
+}
+
 /* ============================================================
    SEARCH / PASSENGER PAGE
    ============================================================ */
@@ -849,6 +862,12 @@ input, select, button, textarea {
     max-width: 960px;
     margin: 0 auto;
     padding: 40px 24px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .page-header {
@@ -1618,37 +1637,6 @@ input, select, button, textarea {
     font-weight: 700;
     letter-spacing: 0.08em;
     margin-bottom: 16px;
-}
-
-/* Legacy feature-card kept for backward compat in other pages */
-.feature-card {
-    background: var(--bg-surface);
-    padding: 24px;
-    border: 1px solid var(--border);
-    transition: all var(--transition);
-}
-
-.feature-card:hover {
-    border-color: var(--accent);
-    background: var(--bg-elevated);
-}
-
-.feature-icon {
-    font-size: 1.5rem;
-    margin-bottom: 12px;
-}
-
-.feature-card h3 {
-    font-size: 0.95rem;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.feature-card p {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin-bottom: 10px;
 }
 
 /* Architecture */

@@ -60,8 +60,10 @@ async fn test_create_route_placeholder() {
     let app = test_app();
 
     let body = serde_json::json!({
-        "origin": "Test Origin",
-        "destination": "Test Destination"
+        "origin_address": "Test Origin",
+        "dest_address": "Test Destination",
+        "departure_time": "2026-06-16T10:00:00",
+        "seats_available": 4
     });
 
     let response = app
@@ -77,6 +79,150 @@ async fn test_create_route_placeholder() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
+
+    let resp_body = response.into_body().collect().await.unwrap().to_bytes();
+    let route: Route = serde_json::from_slice(&resp_body).unwrap();
+    assert_eq!(route.origin_address, "Test Origin");
+    assert_eq!(route.dest_address, "Test Destination");
+    assert_eq!(route.driver_id, "driver-demo");
+    assert_eq!(route.seats_available, 4);
+    assert!(route.id.starts_with("route-"));
+}
+
+#[tokio::test]
+async fn test_create_route_persists() {
+    let app = test_app();
+
+    let new_route = serde_json::json!({
+        "origin_address": "Persist Origin",
+        "dest_address": "Persist Destination",
+        "departure_time": "2026-06-16T12:00:00",
+        "seats_available": 2
+    });
+
+    // Create the route
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/routes")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_string(&new_route).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify it appears in GET /api/v1/routes
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/routes")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let routes: Vec<Route> = serde_json::from_slice(&body).unwrap();
+
+    // 4 sample + 1 new
+    assert_eq!(routes.len(), 5, "Should have 5 routes after creating one");
+    assert!(
+        routes.iter().any(|r| r.origin_address == "Persist Origin"),
+        "New route should appear in list"
+    );
+}
+
+#[tokio::test]
+async fn test_create_route_missing_fields() {
+    let app = test_app();
+
+    let body = serde_json::json!({
+        "origin_address": "",
+        "dest_address": ""
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/routes")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_join_route_success() {
+    let app = test_app();
+
+    // Join route-001 which has 3 seats
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/routes/route-001/join")
+                .header("content-type", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let msg: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(msg["type"], "joined");
+
+    // Verify seats were decremented by listing routes
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/routes")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let routes: Vec<Route> = serde_json::from_slice(&body).unwrap();
+
+    let route_001 = routes.iter().find(|r| r.id == "route-001").unwrap();
+    assert_eq!(route_001.seats_available, 2, "Seats should have been decremented from 3 to 2");
+}
+
+#[tokio::test]
+async fn test_join_route_not_found() {
+    let app = test_app();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/routes/route-nonexistent/join")
+                .header("content-type", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]

@@ -11,8 +11,9 @@ pub fn PassengerPage() -> Element {
     let mut all_routes = use_signal(Vec::<Route>::new);
     let mut loading = use_signal(|| false);
     let mut active_tab = use_signal(|| 0u8);
-    #[allow(clippy::redundant_closure)]
-    let mut error_msg = use_signal(|| String::new());
+    let mut error_msg = use_signal(String::new);
+    let joining_id = use_signal(String::new);
+    let joined_ids = use_signal(Vec::<String>::new);
 
     rsx! {
         section { class: "page-section",
@@ -163,7 +164,36 @@ pub fn PassengerPage() -> Element {
                                             "{m.route.driver_id.chars().next().unwrap_or('D')}"
                                         }
                                         span { class: "driver-verified-badge", "Verificado" }
-                                        button { class: "route-join-btn", "Unirme" }
+                                        button {
+                                            class: if joined_ids().contains(&m.route.id.clone()) { "route-join-btn joined" } else { "route-join-btn" },
+                                            disabled: joining_id() == m.route.id || joined_ids().contains(&m.route.id.clone()),
+                                            onclick: move |_| {
+                                                let route_id = m.route.id.clone();
+                                                let mut joined_ids = joined_ids;
+                                                let mut joining_id = joining_id;
+                                                let mut error_msg = error_msg;
+                                                async move {
+                                                    joining_id.set(route_id.clone());
+                                                    let client = reqwest::Client::new();
+                                                    match client.post(format!("/api/v1/routes/{}/join", route_id))
+                                                        .send()
+                                                        .await
+                                                    {
+                                                        Ok(resp) if resp.status().is_success() => {
+                                                            let mut ids = joined_ids();
+                                                            ids.push(route_id.clone());
+                                                            joined_ids.set(ids);
+                                                        }
+                                                        Ok(resp) => error_msg.set(format!("Error al unirse: {}", resp.status())),
+                                                        Err(e) => error_msg.set(format!("No se pudo conectar: {}", e)),
+                                                    }
+                                                    joining_id.set(String::new());
+                                                }
+                                            },
+                                            if joined_ids().contains(&m.route.id.clone()) { "Solicitado ✓" }
+                                            else if joining_id() == m.route.id { "Solicitando..." }
+                                            else { "Unirme" }
+                                        }
                                     }
                                 }
                             }
@@ -246,7 +276,36 @@ pub fn PassengerPage() -> Element {
                                             "{r.driver_id.chars().next().unwrap_or('D')}"
                                         }
                                         span { class: "driver-verified-badge", "Verificado" }
-                                        button { class: "route-join-btn", "Unirme" }
+                                        button {
+                                            class: if joined_ids().contains(&r.id.clone()) { "route-join-btn joined" } else { "route-join-btn" },
+                                            disabled: joining_id() == r.id || joined_ids().contains(&r.id.clone()),
+                                            onclick: move |_| {
+                                                let route_id = r.id.clone();
+                                                let mut joined_ids = joined_ids;
+                                                let mut joining_id = joining_id;
+                                                let mut error_msg = error_msg;
+                                                async move {
+                                                    joining_id.set(route_id.clone());
+                                                    let client = reqwest::Client::new();
+                                                    match client.post(format!("/api/v1/routes/{}/join", route_id))
+                                                        .send()
+                                                        .await
+                                                    {
+                                                        Ok(resp) if resp.status().is_success() => {
+                                                            let mut ids = joined_ids();
+                                                            ids.push(route_id.clone());
+                                                            joined_ids.set(ids);
+                                                        }
+                                                        Ok(resp) => error_msg.set(format!("Error al unirse: {}", resp.status())),
+                                                        Err(e) => error_msg.set(format!("No se pudo conectar: {}", e)),
+                                                    }
+                                                    joining_id.set(String::new());
+                                                }
+                                            },
+                                            if joined_ids().contains(&r.id.clone()) { "Solicitado ✓" }
+                                            else if joining_id() == r.id { "Solicitando..." }
+                                            else { "Unirme" }
+                                        }
                                     }
                                 }
                             }

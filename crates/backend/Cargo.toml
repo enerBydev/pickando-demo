@@ -22,7 +22,6 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = "0.15"
 tower = "0.5"
-http-body-util = "0.1"
 
 [dev-dependencies]
 http-body-util = "0.1"

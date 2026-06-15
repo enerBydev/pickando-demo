@@ -89,6 +89,7 @@ pub fn test_app() -> Router {
         .route("/api/v1/health", get(routes::health_check))
         .route("/api/v1/routes", get(routes::list_routes))
         .route("/api/v1/routes", post(routes::create_route))
+        .route("/api/v1/routes/{id}/join", post(routes::join_route))
         .route("/api/v1/match", post(routes::find_matches))
         .with_state(state)
         .layer(CorsLayer::permissive())
