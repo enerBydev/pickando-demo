@@ -7,6 +7,10 @@ edition.workspace = true
 name = "pickando-backend"
 path = "src/main.rs"
 
+[lib]
+name = "pickando_backend"
+path = "src/lib.rs"
+
 [dependencies]
 pickando-shared = { path = "../shared" }
 axum = { version = "0.8", features = ["ws"] }
@@ -18,3 +22,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = "0.15"
 tower = "0.5"
+http-body-util = "0.1"
+
+[dev-dependencies]
+http-body-util = "0.1"

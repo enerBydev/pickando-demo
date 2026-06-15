@@ -22,8 +22,8 @@ Thumbs.db
 dist/
 .Dioxus/
 
-# Cargo
-Cargo.lock
+# Cargo — Cargo.lock IS committed for reproducible builds (binary project)
+# Cargo.lock
 
 # Temp
 *.log

@@ -85,7 +85,7 @@ pub fn PassengerPage() -> Element {
                             let lng_val = lng().parse::<f64>().unwrap_or(-99.1332);
                             let radius_val = radius().parse::<f64>().unwrap_or(5.0);
 
-                            let url = format!("/api/v1/match");
+                            let url = "/api/v1/match".to_string();
                             let body = MatchRequest {
                                 lat: lat_val,
                                 lng: lng_val,
