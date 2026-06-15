@@ -11,6 +11,8 @@ pub fn PassengerPage() -> Element {
     let mut all_routes = use_signal(Vec::<Route>::new);
     let mut loading = use_signal(|| false);
     let mut active_tab = use_signal(|| 0u8);
+    #[allow(clippy::redundant_closure)]
+    let mut error_msg = use_signal(|| String::new());
 
     rsx! {
         section { class: "page-section",
@@ -21,21 +23,34 @@ pub fn PassengerPage() -> Element {
                 }
             }
 
+            // Error banner (visible on all tabs when there's an error)
+            if !error_msg().is_empty() {
+                div { class: "error-banner",
+                    span { class: "error-icon", "!" }
+                    span { "{error_msg}" }
+                    button {
+                        class: "error-dismiss",
+                        onclick: move |_| error_msg.set(String::new()),
+                        "✕"
+                    }
+                }
+            }
+
             // Tab navigation
             div { class: "tabs",
                 button {
                     class: if active_tab() == 0 { "tab active" } else { "tab" },
-                    onclick: move |_| active_tab.set(0),
+                    onclick: move |_| { active_tab.set(0); error_msg.set(String::new()); },
                     "Matches"
                 }
                 button {
                     class: if active_tab() == 1 { "tab active" } else { "tab" },
-                    onclick: move |_| active_tab.set(1),
+                    onclick: move |_| { active_tab.set(1); error_msg.set(String::new()); },
                     "Rutas"
                 }
                 button {
                     class: if active_tab() == 2 { "tab active" } else { "tab" },
-                    onclick: move |_| active_tab.set(2),
+                    onclick: move |_| { active_tab.set(2); error_msg.set(String::new()); },
                     "Sistema"
                 }
             }
@@ -80,6 +95,7 @@ pub fn PassengerPage() -> Element {
                         class: "btn-primary btn-lg",
                         disabled: loading(),
                         onclick: move |_| async move {
+                            error_msg.set(String::new());
                             loading.set(true);
                             let lat_val = lat().parse::<f64>().unwrap_or(19.4326);
                             let lng_val = lng().parse::<f64>().unwrap_or(-99.1332);
@@ -93,10 +109,23 @@ pub fn PassengerPage() -> Element {
                             };
 
                             let client = reqwest::Client::new();
-                            if let Ok(resp) = client.post(&url).json(&body).send().await {
-                                if let Ok(data) = resp.json::<Vec<MatchResult>>().await {
-                                    matches.set(data);
+                            match client.post(&url).json(&body).send().await {
+                                Ok(resp) => {
+                                    if resp.status().is_success() {
+                                        match resp.json::<Vec<MatchResult>>().await {
+                                            Ok(data) => {
+                                                matches.set(data);
+                                                if matches().is_empty() {
+                                                    error_msg.set("No se encontraron viajes cerca de tu ubicación. Intenta con un radio mayor.".into());
+                                                }
+                                            }
+                                            Err(e) => error_msg.set(format!("Error al procesar respuesta: {}", e)),
+                                        }
+                                    } else {
+                                        error_msg.set(format!("Error del servidor: {}", resp.status()));
+                                    }
                                 }
+                                Err(e) => error_msg.set(format!("No se pudo conectar al backend. Verifica tu conexión: {}", e)),
                             }
                             loading.set(false);
                         },
@@ -112,7 +141,6 @@ pub fn PassengerPage() -> Element {
                             for m in matches() {
                                 div { class: "route-card-v2",
                                     key: "{m.route.id}",
-                                    // Left: Route visualization
                                     div { class: "route-card-map",
                                         div { class: "route-line-visual",
                                             span { class: "route-dot origin" }
@@ -121,7 +149,6 @@ pub fn PassengerPage() -> Element {
                                         }
                                         span { class: "route-distance", "{m.distance_km:.1} km" }
                                     }
-                                    // Center: Route details
                                     div { class: "route-card-details",
                                         span { class: "route-origin", "{m.route.origin_address}" }
                                         span { class: "route-arrow", "↓" }
@@ -131,7 +158,6 @@ pub fn PassengerPage() -> Element {
                                             span { "{m.route.seats_available} asientos" }
                                         }
                                     }
-                                    // Right: Driver + CTA
                                     div { class: "route-card-action",
                                         div { class: "driver-avatar verified",
                                             "{m.route.driver_id.chars().next().unwrap_or('D')}"
@@ -142,7 +168,7 @@ pub fn PassengerPage() -> Element {
                                 }
                             }
                         }
-                    } else if !loading() {
+                    } else if !loading() && error_msg().is_empty() {
                         div { class: "empty-state",
                             p { "Ingresa coordenadas y busca rutas compatibles" }
                             p { class: "hint", "Prueba: 19.4326, -99.1332 con radio 5km" }
@@ -163,12 +189,26 @@ pub fn PassengerPage() -> Element {
                         class: "btn-primary",
                         disabled: loading(),
                         onclick: move |_| async move {
+                            error_msg.set(String::new());
                             loading.set(true);
                             let url = "/api/v1/routes";
-                            if let Ok(resp) = reqwest::get(url).await {
-                                if let Ok(data) = resp.json::<Vec<Route>>().await {
-                                    all_routes.set(data);
+                            match reqwest::get(url).await {
+                                Ok(resp) => {
+                                    if resp.status().is_success() {
+                                        match resp.json::<Vec<Route>>().await {
+                                            Ok(data) => {
+                                                all_routes.set(data);
+                                                if all_routes().is_empty() {
+                                                    error_msg.set("No hay rutas publicadas actualmente.".into());
+                                                }
+                                            }
+                                            Err(e) => error_msg.set(format!("Error al procesar rutas: {}", e)),
+                                        }
+                                    } else {
+                                        error_msg.set(format!("Error del servidor: {}", resp.status()));
+                                    }
                                 }
+                                Err(e) => error_msg.set(format!("No se pudo conectar al backend: {}", e)),
                             }
                             loading.set(false);
                         },
@@ -184,7 +224,6 @@ pub fn PassengerPage() -> Element {
                             for r in all_routes() {
                                 div { class: "route-card-v2",
                                     key: "{r.id}",
-                                    // Left: Route visualization
                                     div { class: "route-card-map",
                                         div { class: "route-line-visual",
                                             span { class: "route-dot origin" }
@@ -192,7 +231,6 @@ pub fn PassengerPage() -> Element {
                                             span { class: "route-dot dest" }
                                         }
                                     }
-                                    // Center: Route details
                                     div { class: "route-card-details",
                                         span { class: "route-origin", "{r.origin_address}" }
                                         span { class: "route-arrow", "↓" }
@@ -203,7 +241,6 @@ pub fn PassengerPage() -> Element {
                                             span { class: "seats-badge", "{r.geohash}" }
                                         }
                                     }
-                                    // Right: Driver + CTA
                                     div { class: "route-card-action",
                                         div { class: "driver-avatar verified",
                                             "{r.driver_id.chars().next().unwrap_or('D')}"
@@ -272,6 +309,7 @@ pub fn PassengerPage() -> Element {
 fn HealthChecker() -> Element {
     let mut health = use_signal(|| String::from("Haz clic para verificar"));
     let mut checking = use_signal(|| false);
+    let mut error_msg = use_signal(|| String::from(""));
 
     rsx! {
         button {
@@ -279,17 +317,35 @@ fn HealthChecker() -> Element {
             disabled: checking(),
             onclick: move |_| async move {
                 checking.set(true);
+                error_msg.set(String::new());
                 let url = "/api/v1/health";
-                if let Ok(resp) = reqwest::get(url).await {
-                    if let Ok(data) = resp.text().await {
-                        health.set(data);
+                match reqwest::get(url).await {
+                    Ok(resp) => {
+                        if resp.status().is_success() {
+                            match resp.text().await {
+                                Ok(data) => health.set(data),
+                                Err(e) => error_msg.set(format!("Error leyendo respuesta: {}", e)),
+                            }
+                        } else {
+                            error_msg.set(format!("Backend respondió con status: {}", resp.status()));
+                            health.set(format!("Error: status {}", resp.status()));
+                        }
                     }
-                } else {
-                    health.set("Error: No se pudo conectar al backend".into());
+                    Err(e) => {
+                        error_msg.set(format!("No se pudo conectar al backend: {}", e));
+                        health.set("Error: No se pudo conectar al backend".into());
+                    }
                 }
                 checking.set(false);
             },
             if checking() { "Verificando..." } else { "Verificar Status" }
+        }
+
+        if !error_msg().is_empty() {
+            div { class: "error-banner",
+                span { class: "error-icon", "!" }
+                span { "{error_msg}" }
+            }
         }
 
         div { class: "status-box",

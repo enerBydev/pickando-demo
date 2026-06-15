@@ -29,14 +29,20 @@
     --accent-hover: #00E67A;
     --accent-dim: rgba(0, 255, 136, 0.12);
     --accent-glow: rgba(0, 255, 136, 0.25);
+    --accent-warm: #FF6B2B;
+    --accent-warm-hover: #FF8850;
+    --accent-warm-dim: rgba(255, 107, 43, 0.12);
     --danger: #FF4466;
     --verified: #00FF88;
     --warning: #FFB020;
     --radius: 4px;
     --transition: 0.15s ease;
-    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 }
+
+/* --- Google Fonts: Space Grotesk (geometric sans-serif) --- */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 html { scroll-behavior: smooth; }
 
@@ -911,6 +917,53 @@ input, select, button, textarea {
     margin-bottom: 20px;
 }
 
+/* --- Error Banner --- */
+.error-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(255, 68, 102, 0.1);
+    border: 1px solid rgba(255, 68, 102, 0.3);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    color: #FF8899;
+}
+
+.error-banner .error-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: var(--danger);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.error-banner .error-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 4px;
+}
+
+.error-banner .error-dismiss:hover {
+    color: var(--text-primary);
+}
+
+/* --- Accent Warm (Neon Orange) utilities --- */
+.accent-warm { color: var(--accent-warm); }
+.accent-warm-bg { background: var(--accent-warm); color: #000; }
+.accent-warm-dim { background: var(--accent-warm-dim); color: var(--accent-warm); }
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1416,17 +1469,158 @@ input, select, button, textarea {
 }
 
 /* ============================================================
-   FEATURES GRID (kept for landing but restyled)
+   ASYMMETRIC FEATURE STRIP — varied sizes, user-benefit copy
+   ANTI-GENUI: No 3×2 grid. Varied card sizes create visual rhythm.
    ============================================================ */
-.features {
+.features-asymmetric {
     max-width: 1280px;
     margin: 0 auto;
     padding: 60px 24px;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: auto auto;
     gap: 2px;
 }
 
+.feature-wide {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.feature-tall {
+    grid-column: 2;
+    grid-row: 1 / 3;
+}
+
+.feature-small {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.feature-inner {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    transition: all var(--transition);
+}
+
+.feature-inner:hover {
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+}
+
+.feature-eyebrow {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+}
+
+.feature-tall .feature-eyebrow {
+    color: var(--accent-warm);
+}
+
+.feature-inner h3 {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+}
+
+.feature-inner p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    flex: 1;
+}
+
+.feature-cta {
+    display: inline-flex;
+    align-items: center;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 8px 18px;
+    border-radius: var(--radius);
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all var(--transition);
+    align-self: flex-start;
+}
+
+.feature-cta:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+.feature-stat {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: var(--accent);
+    display: block;
+}
+
+.feature-stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.feature-small .feature-inner p {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0;
+}
+
+/* Hero trust chips */
+.hero-trust-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.trust-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.trust-icon {
+    font-size: 0.8rem;
+}
+
+.hero-badge.accent-warm-dim {
+    background: var(--accent-warm-dim);
+    color: var(--accent-warm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: var(--radius);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+}
+
+/* Legacy feature-card kept for backward compat in other pages */
 .feature-card {
     background: var(--bg-surface);
     padding: 24px;
@@ -1566,8 +1760,13 @@ input, select, button, textarea {
         justify-content: space-between;
     }
 
-    .features {
+    .features-asymmetric {
         grid-template-columns: 1fr;
+    }
+
+    .feature-tall {
+        grid-column: 1;
+        grid-row: auto;
     }
 
     .arch-grid {

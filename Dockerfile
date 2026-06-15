@@ -117,7 +117,7 @@ RUN cat > /app/dist/index.html << 'HTMLEOF'
             width: 40px;
             height: 40px;
             border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid #4ecdc4;
+            border-top: 3px solid #00FF88;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-right: 16px;
@@ -137,7 +137,7 @@ RUN cat > /app/dist/index.html << 'HTMLEOF'
         import init from '/assets/pickando.js';
         init('/assets/pickando_bg.wasm').catch(e => {
             console.error('Failed to initialize Pickando:', e);
-            document.getElementById('main').innerHTML = '<div style="text-align:center;padding:2rem;"><h2 style="color:#ff6b6b;">Error al cargar</h2><p style="color:#aaa;">' + (e.message || 'Unknown error') + '</p><button onclick="location.reload()" style="margin-top:1rem;padding:0.5rem 1rem;background:#4ecdc4;border:none;border-radius:6px;cursor:pointer;color:#000;">Reintentar</button></div>';
+            document.getElementById('main').innerHTML = '<div style="text-align:center;padding:2rem;"><h2 style="color:#ff6b6b;">Error al cargar</h2><p style="color:#aaa;">' + (e.message || 'Unknown error') + '</p><button onclick="location.reload()" style="margin-top:1rem;padding:0.5rem 1rem;background:#00FF88;border:none;border-radius:6px;cursor:pointer;color:#000;">Reintentar</button></div>';
         });
     </script>
 </body>

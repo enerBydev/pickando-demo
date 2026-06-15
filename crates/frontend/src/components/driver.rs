@@ -9,6 +9,8 @@ pub fn DriverPage() -> Element {
     let mut seats = use_signal(|| String::from("3"));
     let mut time = use_signal(|| String::from("08:00"));
     let mut published = use_signal(|| false);
+    let mut publishing = use_signal(|| false);
+    let mut error_msg = use_signal(|| String::from(""));
 
     rsx! {
         section { class: "page-section",
@@ -68,14 +70,53 @@ pub fn DriverPage() -> Element {
                         span { class: "convo-label", " asientos" }
                     }
 
+                    // Error message display
+                    if !error_msg().is_empty() {
+                        div { class: "error-banner",
+                            span { class: "error-icon", "!" }
+                            span { "{error_msg}" }
+                        }
+                    }
+
                     button {
                         class: "convo-publish-btn",
-                        onclick: move |_| published.set(true),
-                        "Publicar Ruta"
+                        disabled: publishing(),
+                        onclick: move |_| async move {
+                            error_msg.set(String::new());
+                            publishing.set(true);
+
+                            // POST to the real backend endpoint
+                            let body = serde_json::json!({
+                                "origin_address": origin(),
+                                "dest_address": dest(),
+                                "departure_time": time(),
+                                "seats_available": seats().parse::<u32>().unwrap_or(1),
+                            });
+
+                            let client = reqwest::Client::new();
+                            match client.post("/api/v1/routes")
+                                .json(&body)
+                                .send()
+                                .await
+                            {
+                                Ok(resp) => {
+                                    if resp.status().is_success() {
+                                        published.set(true);
+                                    } else {
+                                        error_msg.set(format!("Error del servidor: {}", resp.status()));
+                                    }
+                                }
+                                Err(e) => {
+                                    error_msg.set(format!("No se pudo conectar al backend: {}", e));
+                                }
+                            }
+                            publishing.set(false);
+                        },
+                        if publishing() { "Publicando..." } else { "Publicar Ruta" }
                     }
 
                     p { class: "form-note",
-                        "TODO M2: POST /api/v1/routes — Conexión real al backend"
+                        "POST /api/v1/routes — Conexión real al backend (acepta JSON, responde confirmación)"
                     }
                 }
             } else {
@@ -104,7 +145,10 @@ pub fn DriverPage() -> Element {
                     }
                     button {
                         class: "btn-reset",
-                        onclick: move |_| published.set(false),
+                        onclick: move |_| {
+                            published.set(false);
+                            error_msg.set(String::new());
+                        },
                         "Publicar otra ruta"
                     }
                 }
