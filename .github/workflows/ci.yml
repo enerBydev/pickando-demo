@@ -61,7 +61,7 @@ jobs:
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-test-
 
-      - name: Run tests
+      - name: Run all tests
         run: cargo test --workspace --verbose
 
   build-backend:
@@ -73,6 +73,16 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-backend-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-backend-
 
       - name: Build backend
         run: cargo build --release -p pickando-backend
@@ -96,11 +106,69 @@ jobs:
       - name: Install WASM target
         run: rustup target add wasm32-unknown-unknown
 
-      - name: Install Dioxus CLI
-        run: cargo install dioxus-cli --version 0.7.9
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-wasm-
 
-      - name: Build frontend for web
-        run: cd crates/frontend && dx build --platform web --release
+      - name: Build frontend WASM
+        run: cargo build --release --target wasm32-unknown-unknown -p pickando-frontend
+
+      - name: Install wasm-bindgen-cli
+        run: |
+          WASM_BINDGEN_VER=$(grep -A1 'name = "wasm-bindgen"' Cargo.lock | grep version | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "Installing wasm-bindgen-cli v${WASM_BINDGEN_VER}"
+          cargo install wasm-bindgen-cli --version "${WASM_BINDGEN_VER}"
+
+      - name: Process WASM with bindgen
+        run: |
+          WASM_FILE=$(find target/wasm32-unknown-unknown/release/deps -name "pickando_frontend*.wasm" ! -name "*_*" | head -1)
+          if [ -z "$WASM_FILE" ]; then
+            WASM_FILE=$(find target/wasm32-unknown-unknown/release/deps -name "pickando_frontend-*.wasm" | head -1)
+          fi
+          echo "Processing: $WASM_FILE"
+          mkdir -p crates/frontend/dist/assets
+          wasm-bindgen --target web --out-dir crates/frontend/dist/assets --out-name pickando "$WASM_FILE"
+
+      - name: Copy static assets
+        run: |
+          cp crates/frontend/assets/main.css crates/frontend/dist/assets/
+          cat > crates/frontend/dist/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Pickando — Same-Direction Local Mobility</title>
+              <link rel="stylesheet" href="/assets/main.css" />
+              <style>
+                  .wasm-loading{display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0a0a;color:#e0e0e0;font-family:system-ui,sans-serif}
+                  .wasm-loading-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,0.1);border-top:3px solid #4ecdc4;border-radius:50%;animation:spin 1s linear infinite;margin-right:16px}
+                  @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+              </style>
+          </head>
+          <body>
+              <div id="main" class="wasm-loading"><div class="wasm-loading-spinner"></div><span>Cargando Pickando...</span></div>
+              <script type="module">
+                  import init from '/assets/pickando.js';
+                  init('/assets/pickando_bg.wasm').catch(e=>{console.error(e);document.getElementById('main').innerHTML='<div style="text-align:center;padding:2rem"><h2 style="color:#ff6b6b">Error al cargar</h2><p style="color:#aaa">'+(e.message||'Unknown error')+'</p></div>'});
+              </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Verify output
+        run: |
+          test -f crates/frontend/dist/index.html || (echo "Missing index.html" && exit 1)
+          test -f crates/frontend/dist/assets/pickando.js || (echo "Missing pickando.js" && exit 1)
+          test -f crates/frontend/dist/assets/pickando_bg.wasm || (echo "Missing WASM" && exit 1)
+          test -f crates/frontend/dist/assets/main.css || (echo "Missing CSS" && exit 1)
+          echo "All frontend files verified"
 
       - name: Upload frontend dist
         uses: actions/upload-artifact@v4

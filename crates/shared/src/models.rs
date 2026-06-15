@@ -36,8 +36,8 @@ pub enum RouteStatus {
 pub struct MatchResult {
     pub route: Route,
     pub distance_km: f64,
-    pub direction_similarity: f64,  // TODO: real algorithm in M2
-    pub time_compatibility: f64,    // TODO: temporal window in M2
+    pub direction_similarity: f64, // TODO: real algorithm in M2
+    pub time_compatibility: f64,   // TODO: temporal window in M2
     pub relevance_score: f64,
 }
 
