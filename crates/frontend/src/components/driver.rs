@@ -1,3 +1,4 @@
+use crate::api_url;
 use dioxus::prelude::*;
 
 /// Driver page — Conversational route publishing flow.
@@ -94,7 +95,7 @@ pub fn DriverPage() -> Element {
                             });
 
                             let client = reqwest::Client::new();
-                            match client.post("/api/v1/routes")
+                            match client.post(api_url("/api/v1/routes"))
                                 .json(&body)
                                 .send()
                                 .await
