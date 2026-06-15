@@ -4,6 +4,23 @@ use components::*;
 
 use dioxus::prelude::*;
 
+/// Construct an absolute API URL from a relative path.
+/// In WASM, reqwest requires absolute URLs because it uses window.fetch() internally.
+/// On desktop/mobile, relative URLs work fine.
+pub fn api_url(path: &str) -> String {
+    #[cfg(target_arch = "wasm32")]
+    {
+        web_sys::window()
+            .and_then(|w| w.location().origin().ok())
+            .map(|origin| format!("{}{}", origin, path))
+            .unwrap_or_else(|| path.to_string())
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        path.to_string()
+    }
+}
+
 fn main() {
     dioxus::launch(App);
 }

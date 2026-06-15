@@ -1,3 +1,4 @@
+use crate::api_url;
 use dioxus::prelude::*;
 use pickando_shared::models::{MatchRequest, MatchResult, Route};
 
@@ -102,7 +103,7 @@ pub fn PassengerPage() -> Element {
                             let lng_val = lng().parse::<f64>().unwrap_or(-99.1332);
                             let radius_val = radius().parse::<f64>().unwrap_or(5.0);
 
-                            let url = "/api/v1/match".to_string();
+                            let url = api_url("/api/v1/match");
                             let body = MatchRequest {
                                 lat: lat_val,
                                 lng: lng_val,
@@ -175,7 +176,7 @@ pub fn PassengerPage() -> Element {
                                                 async move {
                                                     joining_id.set(route_id.clone());
                                                     let client = reqwest::Client::new();
-                                                    match client.post(format!("/api/v1/routes/{}/join", route_id))
+                                                    match client.post(api_url(&format!("/api/v1/routes/{}/join", route_id)))
                                                         .send()
                                                         .await
                                                     {
@@ -221,7 +222,7 @@ pub fn PassengerPage() -> Element {
                         onclick: move |_| async move {
                             error_msg.set(String::new());
                             loading.set(true);
-                            let url = "/api/v1/routes";
+                            let url = api_url("/api/v1/routes");
                             match reqwest::get(url).await {
                                 Ok(resp) => {
                                     if resp.status().is_success() {
@@ -287,7 +288,7 @@ pub fn PassengerPage() -> Element {
                                                 async move {
                                                     joining_id.set(route_id.clone());
                                                     let client = reqwest::Client::new();
-                                                    match client.post(format!("/api/v1/routes/{}/join", route_id))
+                                                    match client.post(api_url(&format!("/api/v1/routes/{}/join", route_id)))
                                                         .send()
                                                         .await
                                                     {
@@ -377,7 +378,7 @@ fn HealthChecker() -> Element {
             onclick: move |_| async move {
                 checking.set(true);
                 error_msg.set(String::new());
-                let url = "/api/v1/health";
+                let url = api_url("/api/v1/health");
                 match reqwest::get(url).await {
                     Ok(resp) => {
                         if resp.status().is_success() {
