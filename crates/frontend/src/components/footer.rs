@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+/// Footer — minimal dark, essential info only.
 #[component]
 pub fn Footer() -> Element {
     rsx! {

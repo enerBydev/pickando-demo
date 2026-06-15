@@ -33,7 +33,7 @@ fn App() -> Element {
             // Page content
             main { class: "main-content",
                 match active_page() {
-                    Page::Home => rsx! { LandingPage {} },
+                    Page::Home => rsx! { LandingPage { on_navigate: move |page: Page| active_page.set(page) } },
                     Page::Driver => rsx! { DriverPage {} },
                     Page::Passenger => rsx! { PassengerPage {} },
                     Page::About => rsx! { AboutPage {} },
