@@ -1,6 +1,5 @@
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
-use futures::{SinkExt, StreamExt};
 use pickando_shared::models::WsMessage;
 
 /// GET /ws — WebSocket endpoint.
