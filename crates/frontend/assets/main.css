@@ -1492,6 +1492,18 @@ body {
     .hero-subtitle { font-size: 1rem; }
     .hero-actions { flex-direction: column; align-items: stretch; }
 
+    /* Hero badge: shrink text and gaps on mobile so it doesn't truncate */
+    .hero-badge {
+        font-size: 0.62rem;
+        letter-spacing: 0.6px;
+        padding: 6px 12px;
+        gap: 6px;
+        white-space: nowrap;
+        max-width: calc(100vw - 32px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .section-title { font-size: 1.8rem; }
     .section-subtitle { font-size: 0.95rem; margin-bottom: 32px; }
 
@@ -1512,6 +1524,18 @@ body {
     .page-header h1 { font-size: 1.8rem; }
     .landing-cta-inner h2 { font-size: 1.8rem; }
     .landing-cta-inner p { font-size: 1rem; }
+
+    /* Stack tabs vertically on very narrow screens so labels don't truncate */
+    .tabs { flex-wrap: wrap; gap: 4px; }
+    .tabs .tab { flex: 1 1 calc(50% - 4px); min-width: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Match/route cards: stack meta info vertically on mobile */
+    .match-header, .route-header { flex-wrap: wrap; gap: 6px; }
+    .match-footer { flex-direction: column; align-items: flex-start; gap: 10px; }
+
+    /* Hero trust badges: wrap on mobile */
+    .hero-trust { flex-wrap: wrap; justify-content: center; gap: 8px 12px; }
+    .hero-trust-dot { display: none; }
 }
 
 /* ============ Scrollbar ============ */
