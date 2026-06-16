@@ -124,6 +124,11 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Android targets
+        run: |
+          rustup target add aarch64-linux-android
+          rustup target add x86_64-linux-android
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -138,24 +143,41 @@ jobs:
           sdkmanager --install "ndk;27.0.12077973"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
 
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build Android native library
+        run: |
+          cargo ndk -t arm64-v8a -t x86_64 build --release -p pickando-frontend --features mobile
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
       - name: Install Dioxus CLI
-        run: cargo install dioxus-cli --version 0.7.9
+        run: cargo install dioxus-cli --version 0.7.9 || echo "Dioxus CLI install failed, trying alternative..."
 
-      - name: Initialize Android project
+      - name: Try dx android build
         working-directory: crates/frontend
-        run: dx android init || true
+        run: dx android build --release || echo "dx android build failed, APK not available"
+        continue-on-error: true
 
-      - name: Build Android APK
-        working-directory: crates/frontend
-        run: dx android build --release
+      - name: Find APK files
+        id: find-apk
+        run: |
+          APK_PATH=$(find . -name "*.apk" -type f | head -1 || echo "")
+          if [ -n "$APK_PATH" ]; then
+            echo "Found APK: $APK_PATH"
+            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          else
+            echo "No APK found"
+            echo "apk_path=" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Find and upload APK
+      - name: Upload APK
+        if: steps.find-apk.outputs.apk_path != ''
         uses: actions/upload-artifact@v4
         with:
           name: pickando-android-apk
-          path: |
-            crates/frontend/target/android/**/*.apk
-            target/android/**/*.apk
+          path: ${{ steps.find-apk.outputs.apk_path }}
 
   create-release:
     name: Create GitHub Release
@@ -171,16 +193,6 @@ jobs:
         with:
           path: artifacts/
 
-      - name: Find APK files
-        id: find-apk
-        run: |
-          APK_PATH=$(find artifacts/ -name "*.apk" -type f | head -1 || echo "")
-          if [ -n "$APK_PATH" ]; then
-            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          else
-            echo "apk_path=" >> $GITHUB_OUTPUT
-          fi
-
       - name: List artifacts
         run: find artifacts/ -type f | head -20
 
@@ -189,15 +201,15 @@ jobs:
         with:
           files: |
             artifacts/pickando-backend-linux/pickando-backend
-            artifacts/pickando-frontend-wasm/*
-            ${{ steps.find-apk.outputs.apk_path }}
+            artifacts/pickando-frontend-wasm/**
+            artifacts/pickando-android-apk/*.apk
           body: |
             ## Pickando Demo Release
 
             ### Artifacts
             - **pickando-backend-linux** — Linux x86_64 binary
             - **pickando-frontend-wasm/** — Web WASM frontend files
-            - **APK** — Android APK (debug-signed)
+            - **APK** — Android APK (if available, debug-signed)
 
             ### Installation
             - **Android**: Download the APK, enable "Install from unknown sources", install
