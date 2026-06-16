@@ -2,6 +2,7 @@ use crate::Page;
 use dioxus::prelude::*;
 
 /// Navbar — minimal dark, functional navigation.
+/// Shows "Iniciar Sesión" on public pages, user avatar + logout on dashboard-access pages.
 #[component]
 pub fn Navbar(active_page: Page, on_navigate: EventHandler<Page>) -> Element {
     let mut mobile_open = use_signal(|| false);
@@ -33,8 +34,13 @@ pub fn Navbar(active_page: Page, on_navigate: EventHandler<Page>) -> Element {
                     }
                 }
 
-                div { class: "platform-badge",
-                    span { "Rust + Dioxus" }
+                // Right side: login button or user avatar
+                div { class: "navbar-user",
+                    button {
+                        class: "navbar-login-btn",
+                        onclick: move |_| on_navigate.call(Page::Login),
+                        "Iniciar Sesión"
+                    }
                 }
 
                 button {
@@ -55,6 +61,14 @@ pub fn Navbar(active_page: Page, on_navigate: EventHandler<Page>) -> Element {
                             },
                             "{label}"
                         }
+                    }
+                    button {
+                        class: "mobile-link",
+                        onclick: move |_| {
+                            mobile_open.set(false);
+                            on_navigate.call(Page::Login);
+                        },
+                        "Iniciar Sesión"
                     }
                 }
             }

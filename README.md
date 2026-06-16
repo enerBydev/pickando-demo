@@ -1,7 +1,7 @@
 # Pickando Demo — Same-Direction Local Mobility
 
-> **Proof of execution** — no es MVP, no es M1, es el esqueleto andando.
-> Demuestra que Rust + Dioxus compila a WASM, Axum sirve API, y el matching funciona.
+> **Proof of execution** — Demo funcional que demuestra Rust + Dioxus + Axum + Matching Engine.
+> No es MVP, no es M1 — es el esqueleto andando, listo para revisión.
 
 ---
 
@@ -9,9 +9,10 @@
 
 | Recurso | URL |
 |---------|-----|
-| Frontend + Backend | https://pickando-demo-production.up.railway.app/ |
-| Health Check | https://pickando-demo-production.up.railway.app/api/v1/health |
-| Repositorio | https://github.com/enerbydev/pickando-demo |
+| **Frontend + Backend** | https://pickando-demo-production.up.railway.app/ |
+| **Health Check** | https://pickando-demo-production.up.railway.app/api/v1/health |
+| **Repositorio** | https://github.com/enerbydev/pickando-demo |
+| **APK Android** | Disponible en [GitHub Releases](https://github.com/enerbydev/pickando-demo/releases) (tag `v*`) |
 
 ---
 
@@ -38,7 +39,7 @@ pickando-demo/
 │   ├── backend/      # API REST + WebSocket (Axum)
 │   └── frontend/     # App Dioxus (Web WASM / Desktop / Android)
 ├── scripts/          # E2E tests + visual validation
-├── .github/workflows/ # CI/CD
+├── .github/workflows/ # CI/CD (build + test + APK)
 ├── Dockerfile        # Build para Railway
 └── railway.json      # Configuración Railway
 ```
@@ -89,6 +90,16 @@ bash build-wasm.sh
 # Output en crates/frontend/dist/
 ```
 
+### Opción 4: Android APK
+
+```bash
+# Requisitos previos
+cargo install dioxus-cli --version 0.7.9
+dx android init  # primera vez — configura NDK
+dx android build --release
+# Output: target/android/app/release/app-release.apk
+```
+
 ### Railway (deploy automático)
 
 1. Conectar repo `enerbydev/pickando-demo` en Railway
@@ -105,8 +116,8 @@ bash build-wasm.sh
 | GET | `/api/v1/health` | Health check con uptime y metadata | `curl .../api/v1/health` |
 | GET | `/api/v1/routes` | Listar todas las rutas publicadas | `curl .../api/v1/routes` |
 | POST | `/api/v1/routes` | Crear nueva ruta (persiste en memoria) | Ver ejemplo abajo |
-| POST | `/api/v1/match` | Buscar rutas compatibles por ubicación | Ver ejemplo abajo |
 | POST | `/api/v1/routes/{id}/join` | Unirse a una ruta existente | Ver ejemplo abajo |
+| POST | `/api/v1/match` | Buscar rutas compatibles por ubicación | Ver ejemplo abajo |
 | GET | `/ws` | WebSocket bidireccional (echo server) | `wscat -c wss://.../ws` |
 
 ### Ejemplo: Health Check
@@ -217,12 +228,13 @@ El endpoint `/ws` establece una conexión bidireccional en tiempo real.
 | Componente | Estado | Detalle |
 |-----------|--------|---------|
 | Base de datos | Placeholder | Datos en memoria (Vec<Route>), se pierde al reiniciar. PostgreSQL en M2 |
-| Autenticación | No implementado | Sin login/JWT. Se implementa en M2 |
+| Autenticación | Demo | Login sin credenciales — click "Iniciar Sesión" entra al dashboard. JWT real en M2 |
 | Matching por dirección | Placeholder | Solo proximidad geohash. Dirección similar en M2 |
 | GPS tracking | Placeholder | WebSocket hace echo. GPS streaming en M2 |
 | Pagos | No implementado | Stripe/MercadoPago en M3 |
 | Coordenadas de rutas | Hardcoded | Al publicar ruta, se usan coordenadas default CDMX. Geocoding en M2 |
-| APK Android | Build manual | Requiere Android NDK + `dx android build`. Ver sección Multi-Plataforma |
+| Dashboard datos | Demo | Stats hardcodeados (3 rutas, 12 viajes, etc.). Datos reales en M2 |
+| APK Android | Debug-signed | Firmado con debug key. Release signing en producción |
 
 ---
 
@@ -255,21 +267,14 @@ La app compila a 4 plataformas desde un solo codebase Rust:
 | Backend (Windows) | `cargo build --release -p pickando-backend` | `.exe` |
 | Android | `dx android build --release` | `.apk` |
 
-**Nota sobre APK Android:** El build de Android requiere Android NDK configurado y Dioxus CLI con feature mobile. Para generar el APK:
-```bash
-# Requisitos previos
-cargo install dioxus-cli --version 0.7.9
-dx android init  # primera vez — configura NDK
-dx android build --release
-# Output: target/android/app/release/app-release.apk
-```
+**Nota sobre APK Android:** El APK se genera automáticamente en GitHub Actions al crear un tag `v*`. El APK se firma con una debug key por defecto. Para producción, se requiere configurar signing keys.
 
 ---
 
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): Formato (rustfmt), lint (clippy), tests, build backend + WASM en cada push/PR a `main`
-- **Release** (`.github/workflows/release.yml`): Build Linux binary + WASM artifacts en cada tag `v*`
+- **Release** (`.github/workflows/release.yml`): Build Linux binary + WASM + Android APK en cada tag `v*`. Crea GitHub Release con todos los artefactos.
 - **Railway**: Deploy automático desde `main` branch via Dockerfile
 
 ---
@@ -277,7 +282,7 @@ dx android build --release
 ## Tests
 
 ```bash
-# Tests unitarios + integración (26 tests)
+# Tests unitarios + integración
 cargo test --workspace
 
 # E2E smoke tests (requiere Railway deploy)
