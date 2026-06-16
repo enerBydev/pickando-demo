@@ -21,6 +21,22 @@ pub fn api_url(path: &str) -> String {
     }
 }
 
+/// Remove the WASM loading spinner once Dioxus has mounted.
+/// The static HTML has #main with class "wasm-loading" and a spinner.
+/// Once Dioxus replaces the content, we remove the class to hide the spinner.
+fn remove_loading_spinner() {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(main_el) = document.get_element_by_id("main") {
+                    let _ = main_el.class_list().remove_1("wasm-loading");
+                }
+            }
+        }
+    }
+}
+
 fn main() {
     dioxus::launch(App);
 }
@@ -39,6 +55,11 @@ enum Page {
 #[component]
 fn App() -> Element {
     let mut active_page = use_signal(|| Page::Home);
+
+    // Remove WASM loading spinner on mount
+    use_hook(|| {
+        remove_loading_spinner();
+    });
 
     rsx! {
         document::Link { rel: "stylesheet", href: "/assets/main.css" }
