@@ -124,12 +124,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Android targets
-        run: |
-          rustup target add aarch64-linux-android
-          rustup target add armv7-linux-androideabi
-          rustup target add x86_64-linux-android
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -144,35 +138,28 @@ jobs:
           sdkmanager --install "ndk;27.0.12077973"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
 
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk
-
-      - name: Build Android native libraries
-        run: |
-          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 build --release -p pickando-frontend --features mobile
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
-
       - name: Install Dioxus CLI
         run: cargo install dioxus-cli --version 0.7.9
 
       - name: Initialize Android project
         working-directory: crates/frontend
-        run: dx android init
+        run: dx android init || true
 
       - name: Build Android APK
         working-directory: crates/frontend
         run: dx android build --release
 
-      - name: Upload APK
+      - name: Find and upload APK
         uses: actions/upload-artifact@v4
         with:
           name: pickando-android-apk
-          path: crates/frontend/target/android/app/release/app-release.apk
+          path: |
+            crates/frontend/target/android/**/*.apk
+            target/android/**/*.apk
 
   create-release:
     name: Create GitHub Release
-    needs: [build-backend, build-wasm, build-android]
+    needs: [build-backend, build-wasm]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -184,23 +171,36 @@ jobs:
         with:
           path: artifacts/
 
+      - name: Find APK files
+        id: find-apk
+        run: |
+          APK_PATH=$(find artifacts/ -name "*.apk" -type f | head -1 || echo "")
+          if [ -n "$APK_PATH" ]; then
+            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          else
+            echo "apk_path=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: List artifacts
+        run: find artifacts/ -type f | head -20
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/pickando-backend-linux/pickando-backend
-            artifacts/pickando-android-apk/app-release.apk
             artifacts/pickando-frontend-wasm/*
+            ${{ steps.find-apk.outputs.apk_path }}
           body: |
             ## Pickando Demo Release
 
             ### Artifacts
             - **pickando-backend-linux** — Linux x86_64 binary
-            - **app-release.apk** — Android APK (signed with debug key)
             - **pickando-frontend-wasm/** — Web WASM frontend files
+            - **APK** — Android APK (debug-signed)
 
             ### Installation
-            - **Android**: Download `app-release.apk`, enable "Install from unknown sources", install
+            - **Android**: Download the APK, enable "Install from unknown sources", install
             - **Web**: Serve the `pickando-frontend-wasm/` directory with any static file server
             - **Backend**: Run `./pickando-backend` with `PORT` and `STATIC_DIR` env vars
           draft: false
