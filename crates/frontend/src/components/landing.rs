@@ -173,12 +173,12 @@ pub fn LandingPage(on_navigate: EventHandler<Page>) -> Element {
                     div { class: "arch-block",
                         div { class: "arch-label", "Database" }
                         div { class: "arch-value", "PostgreSQL" }
-                        div { class: "arch-detail", "TODO M2 — Spatial indexing" }
+                        div { class: "arch-detail", "Proximo: Spatial indexing" }
                     }
                     div { class: "arch-block",
                         div { class: "arch-label", "Cache" }
                         div { class: "arch-value", "Redis" }
-                        div { class: "arch-detail", "TODO M2 — Sessions" }
+                        div { class: "arch-detail", "Proximo: Sessions" }
                     }
                     div { class: "arch-block accent",
                         div { class: "arch-label", "Matching" }

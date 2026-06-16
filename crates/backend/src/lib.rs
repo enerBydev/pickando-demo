@@ -22,8 +22,8 @@ pub fn init_sample_routes() -> Vec<Route> {
         Route {
             id: "route-001".into(),
             driver_id: "driver-001".into(),
-            origin_lat: 19.4326,
-            origin_lng: -99.1332,
+            origin_lat: 19.4360,
+            origin_lng: -99.1290,
             dest_lat: 19.4512,
             dest_lng: -99.1100,
             origin_address: "Zocalo, CDMX".into(),
@@ -31,7 +31,7 @@ pub fn init_sample_routes() -> Vec<Route> {
             departure_time: "2026-06-16T08:00:00".into(),
             seats_available: 3,
             status: RouteStatus::Published,
-            geohash: encode_geohash(19.4326, -99.1332, 6),
+            geohash: encode_geohash(19.4360, -99.1290, 6),
         },
         Route {
             id: "route-002".into(),
