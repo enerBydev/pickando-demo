@@ -152,20 +152,12 @@ jobs:
           path: target/dx/pickando-frontend/release/web/public/
 
   # ============================================================
-  # Build Android APK
+  # Build Android APK — WebView wrapper
   # ============================================================
-  # The Dioxus 0.7 mobile build (dx build --android) is complex and
-  # requires a fully configured Android project (Gradle, NDK, SDK platforms,
-  # build-tools, etc.). When it fails in CI, the user gets NO APK — which is
-  # the exact complaint we are fixing.
-  #
   # Strategy: build a WebView wrapper APK that loads the live deployed site.
-  # This is:
-  #   - Reliable in CI (just Gradle + standard Android SDK, no NDK required)
-  #   - Small (~100KB APK)
-  #   - Fast to build (~2 min vs ~30 min for native)
-  #   - Always works because it just wraps the web app
-  #   - A real APK that the user can install on any Android device
+  # This is reliable in CI (just Gradle + standard Android SDK, no NDK
+  # required), small (~100KB APK), fast to build (~3 min vs ~30+ min for
+  # native), and always works because it just wraps the web app.
   # ============================================================
   build-android:
     name: Build Android APK (WebView wrapper)
@@ -185,288 +177,26 @@ jobs:
           sdk-platform: 34
           sdk-build-tools: 34.0.0
 
-      - name: Generate Android project
+      - name: Verify Android project structure
         run: |
-          mkdir -p android/app/src/main/java/com/pickando/demo
-          mkdir -p android/app/src/main/res/layout
-          mkdir -p android/app/src/main/res/values
-          mkdir -p android/app/src/main/res/xml
-          mkdir -p android/app/src/main/res/mipmap-hdpi
-          mkdir -p android/app/src/main/res/mipmap-mdpi
-          mkdir -p android/app/src/main/res/mipmap-xhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          mkdir -p android/gradle/wrapper
-
-      - name: Write AndroidManifest.xml
-        run: |
-          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.pickando.demo">
-
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-              <application
-                  android:allowBackup="true"
-                  android:icon="@mipmap/ic_launcher"
-                  android:label="Pickando"
-                  android:theme="@style/AppTheme"
-                  android:usesCleartextTraffic="true"
-                  android:networkSecurityConfig="@xml/network_security_config">
-
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:configChanges="orientation|screenSize|keyboardHidden"
-                      android:screenOrientation="portrait">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-
-      - name: Write network security config
-        run: |
-          cat > android/app/src/main/res/xml/network_security_config.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <network-security-config>
-              <base-config cleartextTrafficPermitted="true">
-                  <trust-anchors>
-                      <certificates src="system" />
-                      <certificates src="user" />
-                  </trust-anchors>
-              </base-config>
-          </network-security-config>
-          EOF
-
-      - name: Write MainActivity.java
-        run: |
-          cat > android/app/src/main/java/com/pickando/demo/MainActivity.java << 'EOF'
-          package com.pickando.demo;
-
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.webkit.WebView;
-          import android.webkit.WebSettings;
-          import android.webkit.WebViewClient;
-          import android.view.KeyEvent;
-          import android.view.WindowManager;
-          import android.graphics.Color;
-
-          public class MainActivity extends Activity {
-              private WebView webView;
-
-              // CHANGE THIS to your deployed URL.
-              // Default: the local backend on the device-emulator loopback.
-              private static final String APP_URL = "https://pickando-demo.up.railway.app/";
-
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                  getWindow().setStatusBarColor(Color.parseColor("#0D0D11"));
-
-                  webView = new WebView(this);
-                  setContentView(webView);
-
-                  WebSettings settings = webView.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setDomStorageEnabled(true);
-                  settings.setDatabaseEnabled(true);
-                  settings.setAllowFileAccess(true);
-                  settings.setAllowContentAccess(true);
-                  settings.setLoadWithOverviewMode(true);
-                  settings.setUseWideViewPort(true);
-                  settings.setSupportZoom(false);
-                  settings.setBuiltInZoomControls(false);
-                  settings.setMediaPlaybackRequiresUserGesture(false);
-                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-
-                  webView.setWebViewClient(new WebViewClient() {
-                      @Override
-                      public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                          view.loadUrl(url);
-                          return true;
-                      }
-                  });
-
-                  // Try the production URL; if it fails to load, fall back to a
-                  // built-in error page that explains how to deploy.
-                  webView.loadUrl(APP_URL);
-              }
-
-              @Override
-              public boolean onKeyDown(int keyCode, KeyEvent event) {
-                  if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
-                      webView.goBack();
-                      return true;
-                  }
-                  return super.onKeyDown(keyCode, event);
-              }
-          }
-          EOF
-
-      - name: Write styles.xml
-        run: |
-          cat > android/app/src/main/res/values/styles.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
-                  <item name="android:colorPrimary">#00FF88</item>
-                  <item name="android:colorPrimaryDark">#00C46A</item>
-                  <item name="android:colorAccent">#FF8A3D</item>
-                  <item name="android:windowBackground">#0D0D11</item>
-                  <item name="android:statusBarColor">#0D0D11</item>
-                  <item name="android:navigationBarColor">#0D0D11</item>
-              </style>
-          </resources>
-          EOF
-
-      - name: Write strings.xml
-        run: |
-          cat > android/app/src/main/res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Pickando</string>
-          </resources>
-          EOF
-
-      - name: Write build.gradle (project)
-        run: |
-          cat > android/build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.0'
-              }
-          }
-
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          EOF
-
-      - name: Write build.gradle (app)
-        run: |
-          cat > android/app/build.gradle << 'EOF'
-          apply plugin: 'com.android.application'
-
-          android {
-              namespace 'com.pickando.demo'
-              compileSdk 34
-
-              defaultConfig {
-                  applicationId "com.pickando.demo"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName "0.1.0"
-              }
-
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                  }
-                  debug {
-                      debuggable true
-                  }
-              }
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-          }
-
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-          }
-          EOF
-
-      - name: Write settings.gradle
-        run: |
-          cat > android/settings.gradle << 'EOF'
-          include ':app'
-          EOF
-
-      - name: Write proguard-rules.pro
-        run: |
-          cat > android/app/proguard-rules.pro << 'EOF'
-          # Keep WebView client classes
-          -keep class com.pickando.demo.** { *; }
-          EOF
-
-      - name: Write gradle.properties
-        run: |
-          cat > android/gradle.properties << 'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx2048m
-          EOF
-
-      - name: Write gradle wrapper
-        run: |
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-
-      - name: Generate launcher icon (vector XML)
-        run: |
-          # Use a vector drawable so we don't need a PNG icon
-          mkdir -p android/app/src/main/res/drawable
-          cat > android/app/src/main/res/drawable/ic_launcher_foreground.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp"
-              android:height="108dp"
-              android:viewportWidth="108"
-              android:viewportHeight="108">
-              <path
-                  android:fillColor="#00FF88"
-                  android:pathData="M0,0h108v108h-108z"/>
-              <path
-                  android:fillColor="#0D0D11"
-                  android:fillAlpha="0.85"
-                  android:pathData="M54,30 m-22,0 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0 M54,30 L54,72 M54,72 L42,60 M54,72 L66,60"/>
-          </vector>
-
-          cat > android/app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp"
-              android:height="108dp"
-              android:viewportWidth="108"
-              android:viewportHeight="108">
-              <path
-                  android:fillColor="#0D0D11"
-                  android:pathData="M0,0h108v108h-108z"/>
-          </vector>
-
-          mkdir -p android/app/src/main/res/mipmap-anydpi-v26
-          cat > android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@drawable/ic_launcher_background" />
-              <foreground android:drawable="@drawable/ic_launcher_foreground" />
-          </adaptive-icon>
-          EOF
-          cp android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          echo "=== Android project structure ==="
+          find android -type f | sort
+          echo "=== Verify required files exist ==="
+          test -f android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/java/com/pickando/demo/MainActivity.java
+          test -f android/app/src/main/res/values/strings.xml
+          test -f android/app/src/main/res/values/styles.xml
+          test -f android/app/src/main/res/xml/network_security_config.xml
+          test -f android/app/src/main/res/drawable/ic_launcher_foreground.xml
+          test -f android/app/src/main/res/drawable/ic_launcher_background.xml
+          test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          test -f android/app/build.gradle
+          test -f android/build.gradle
+          test -f android/settings.gradle
+          test -f android/gradle.properties
+          test -f android/gradle/wrapper/gradle-wrapper.properties
+          echo "[OK] All Android project files present"
 
       - name: Set up Gradle
         uses: gradle/gradle-build-action@v2
@@ -492,7 +222,6 @@ jobs:
           echo "Found APK: $APK_PATH"
           cp "$APK_PATH" pickando-demo.apk
           ls -la pickando-demo.apk
-          # Show APK info
           unzip -l pickando-demo.apk | head -20
 
       - name: Sign APK with debug keystore
