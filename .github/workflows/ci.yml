@@ -163,14 +163,14 @@ jobs:
 
       - name: Verify dist contains expected files
         run: |
-          test -f crates/frontend/dist/index.html
-          test -n "$(ls crates/frontend/dist/*.wasm 2>/dev/null)" || \
-            test -n "$(ls crates/frontend/dist/pkg/*.wasm 2>/dev/null)" || \
-            test -n "$(find crates/frontend/dist -name '*.wasm')"
-          echo "WASM bundle OK"
+          DIST_DIR="target/dx/pickando-frontend/release/web/public"
+          test -f "$DIST_DIR/index.html"
+          test -n "$(find "$DIST_DIR" -name '*.wasm')"
+          echo "WASM bundle OK at $DIST_DIR"
+          ls -la "$DIST_DIR"
 
       - name: Upload frontend dist
         uses: actions/upload-artifact@v4
         with:
           name: pickando-frontend-web
-          path: crates/frontend/dist/
+          path: target/dx/pickando-frontend/release/web/public/

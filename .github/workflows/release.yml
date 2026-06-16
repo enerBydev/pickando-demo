@@ -132,14 +132,15 @@ jobs:
 
       - name: Package web bundle
         run: |
+          DIST_DIR="target/dx/pickando-frontend/release/web/public"
           mkdir -p release-web
-          cp -r crates/frontend/dist/* release-web/
+          cp -r "$DIST_DIR"/* release-web/
           cd release-web && zip -r ../pickando-web-wasm.zip .
 
       - uses: actions/upload-artifact@v4
         with:
           name: pickando-web
-          path: crates/frontend/dist/
+          path: target/dx/pickando-frontend/release/web/public/
 
   # ============================================================
   # Build Android APK

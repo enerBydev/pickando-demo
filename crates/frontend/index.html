@@ -154,13 +154,13 @@
 
     <script>
         // ===== Loading screen watchdog =====
-        // Dioxus 0.7 injects a <script type="module" async src="/main.js"></script>
-        // before </body>. That script initializes the WASM and mounts the app into #main.
+        // Dioxus 0.7 injects a module script that initializes the WASM and
+        // mounts the app into #main.
         //
-        // We use a MutationObserver on #main to detect when Dioxus has mounted something,
-        // then hide the loading screen. If after 30s nothing has mounted, we show a clear
-        // error so the user knows WHY the app didn't load (instead of staying stuck on
-        // "Cargando Pickando..." forever).
+        // We poll #main.children.length every 100ms to detect when Dioxus has
+        // mounted something, then hide the loading screen. If after 30s nothing
+        // has mounted, we show a clear error so the user knows WHY the app
+        // didn't load (instead of staying stuck on "Cargando Pickando...").
 
         (function () {
             var status = document.getElementById('loading-status');
@@ -168,6 +168,8 @@
             var errorMsg = document.getElementById('loading-error-msg');
             var loadingScreen = document.getElementById('loading-screen');
             var main = document.getElementById('main');
+            var hidden = false;
+            var startTime = Date.now();
 
             function showFatalError(reason, detail) {
                 if (status) status.style.display = 'none';
@@ -177,21 +179,23 @@
                         '<code>' + detail + '</code>' +
                         '<p style="margin-top:10px;color:#9CA3AF;font-size:0.85rem;">' +
                         'Posibles causas:<br>' +
-                        '• El archivo WASM no se generó o no se sirvió correctamente.<br>' +
-                        '• Hay un error de red o el backend no está respondiendo.<br>' +
-                        '• El navegador no soporta WebAssembly.<br>' +
-                        'Revisa la consola del navegador (F12) para más detalles.</p>';
+                        '- El archivo WASM no se genero o no se sirvio correctamente.<br>' +
+                        '- Hay un error de red o el backend no esta respondiendo.<br>' +
+                        '- El navegador no soporta WebAssembly.<br>' +
+                        'Revisa la consola del navegador (F12) para mas detalles.</p>';
                 }
                 console.error('[Pickando] Fatal load error:', reason, detail);
             }
 
             function hideLoadingScreen() {
-                if (!loadingScreen || !loadingScreen.parentNode) return;
+                if (hidden || !loadingScreen || !loadingScreen.parentNode) return;
+                hidden = true;
                 loadingScreen.style.transition = 'opacity 0.35s ease';
                 loadingScreen.style.opacity = '0';
                 setTimeout(function () {
                     if (loadingScreen.parentNode) loadingScreen.parentNode.removeChild(loadingScreen);
                 }, 400);
+                console.log('[Pickando] App mounted, loading screen hidden');
             }
 
             // Detect WASM support early
@@ -203,26 +207,28 @@
                 return;
             }
 
-            // Watch #main for Dioxus mounting
-            if (main && typeof MutationObserver !== 'undefined') {
-                var observer = new MutationObserver(function (mutations) {
-                    for (var i = 0; i < mutations.length; i++) {
-                        if (mutations[i].addedNodes.length > 0) {
-                            hideLoadingScreen();
-                            observer.disconnect();
-                            return;
-                        }
-                    }
-                });
-                observer.observe(main, { childList: true, subtree: true });
-            }
+            // Poll #main for Dioxus mounting
+            var pollInterval = setInterval(function () {
+                if (hidden) {
+                    clearInterval(pollInterval);
+                    return;
+                }
+                if (main && main.children && main.children.length > 0) {
+                    clearInterval(pollInterval);
+                    hideLoadingScreen();
+                    return;
+                }
+            }, 100);
 
             // Safety net: if after 30s the loading screen is still visible, surface an error
             setTimeout(function () {
-                if (loadingScreen && loadingScreen.parentNode && errorBox.style.display !== 'block') {
+                if (!hidden && loadingScreen && loadingScreen.parentNode) {
+                    clearInterval(pollInterval);
                     showFatalError(
-                        'La aplicación tardó demasiado en iniciar.',
+                        'La aplicacion tardo demasiado en iniciar.',
                         'Timeout after 30 seconds.\n' +
+                        'Elapsed: ' + (Date.now() - startTime) + 'ms\n' +
+                        '#main children: ' + (main ? main.children.length : 'no #main') + '\n' +
                         'The WASM file may be too large, the connection too slow, or main.js failed to load.\n' +
                         'Check the browser console (F12) for errors.'
                     );

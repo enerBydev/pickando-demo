@@ -55,10 +55,11 @@ RUN rustup target add wasm32-unknown-unknown
 # Build the WASM bundle. If this fails, the Docker build fails loudly.
 RUN cd crates/frontend && dx build --platform web --release
 
+# Dioxus 0.7 outputs to target/dx/<crate>/release/web/public/
 # Verify the expected output files exist — fail loudly if missing
-RUN test -f /app/crates/frontend/dist/index.html && \
+RUN test -f /app/target/dx/pickando-frontend/release/web/public/index.html && \
     echo "[OK] index.html present" && \
-    ls -la /app/crates/frontend/dist/
+    ls -la /app/target/dx/pickando-frontend/release/web/public/
 
 # ---------- Stage 2: Runtime ----------
 FROM debian:bookworm-slim
@@ -74,7 +75,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/pickando-backend /app/pickando-backend
 
 # Copy frontend static files (index.html + assets + WASM bundle)
-COPY --from=builder /app/crates/frontend/dist /app/static
+COPY --from=builder /app/target/dx/pickando-frontend/release/web/public /app/static
 
 # Make sure index.html exists at /app/static/index.html for the fallback service
 RUN test -f /app/static/index.html || \

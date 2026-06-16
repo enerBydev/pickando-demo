@@ -15,6 +15,8 @@ watch_path = ["src", "assets"]
 [web.resource]
 style = ["/assets/main.css"]
 
+[web.resource.dev]
+
 [bundle]
 identifier = "com.pickando.demo"
 publisher = "Pickando"
