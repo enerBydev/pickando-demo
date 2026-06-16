@@ -8,7 +8,6 @@ pickando-shared = { path = "../shared" }
 dioxus = { version = "0.7", features = ["router"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-reqwest = { version = "0.12", features = ["json"] }
 
 # WebSocket + browser APIs for the live WS demo
 web-sys = { version = "0.3", features = [
@@ -19,9 +18,23 @@ web-sys = { version = "0.3", features = [
     "Location",
     "Window",
     "ErrorEvent",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "Response",
+    "Headers",
 ] }
 js-sys = "0.3"
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+# reqwest for native builds (desktop, tests)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# reqwest for WASM builds — uses browser fetch, no TLS features needed
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 
 [features]
 default = ["web"]

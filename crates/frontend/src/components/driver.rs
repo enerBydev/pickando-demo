@@ -1,6 +1,8 @@
 use dioxus::prelude::*;
 use pickando_shared::models::Route;
 
+use crate::api;
+
 /// Driver dashboard page.
 /// Connects to the backend via POST /api/v1/routes and shows live passenger
 /// requests polled from GET /api/v1/routes.
@@ -19,10 +21,9 @@ pub fn DriverPage() -> Element {
     // Auto-load my routes on mount
     use_effect(move || {
         spawn(async move {
-            if let Ok(resp) = reqwest::get("/api/v1/routes").await {
-                if let Ok(data) = resp.json::<Vec<Route>>().await {
-                    my_routes.set(data);
-                }
+            match api::fetch_json::<Vec<Route>>("/api/v1/routes").await {
+                Ok(data) => my_routes.set(data),
+                Err(e) => error_msg.set(format!("No se pudieron cargar rutas: {e}")),
             }
         });
     });
@@ -48,7 +49,9 @@ pub fn DriverPage() -> Element {
                         }
                     }
                 }
-            } else { rsx! {} }}
+            } else {
+                rsx! {}
+            }}
 
             {if !error_msg().is_empty() {
                 rsx! {
@@ -62,7 +65,9 @@ pub fn DriverPage() -> Element {
                         }
                     }
                 }
-            } else { rsx! {} }}
+            } else {
+                rsx! {}
+            }}
 
             div { class: "driver-form card",
                 h2 { "Publicar Nueva Ruta" }
@@ -132,27 +137,27 @@ pub fn DriverPage() -> Element {
                             "dest_lng": -99.1100,
                         });
 
-                        let client = reqwest::Client::new();
-                        match client.post("/api/v1/routes")
-                            .json(&body)
-                            .send()
-                            .await
+                        match api::post_json::<pickando_shared::models::WsMessage, _>(
+                            "/api/v1/routes",
+                            &body,
+                        )
+                        .await
                         {
-                            Ok(resp) if resp.status().is_success() => {
+                            Ok(_resp) => {
                                 published.set(true);
-                                success_msg.set("Ruta publicada exitosamente. Visible para pasajeros cercanos.".into());
+                                success_msg.set(
+                                    "Ruta publicada exitosamente. Visible para pasajeros cercanos."
+                                        .into(),
+                                );
                                 // Refresh routes list
-                                if let Ok(resp) = reqwest::get("/api/v1/routes").await {
-                                    if let Ok(data) = resp.json::<Vec<Route>>().await {
-                                        my_routes.set(data);
-                                    }
+                                if let Ok(data) =
+                                    api::fetch_json::<Vec<Route>>("/api/v1/routes").await
+                                {
+                                    my_routes.set(data);
                                 }
                             }
-                            Ok(resp) => {
-                                error_msg.set(format!("Error del servidor: {}", resp.status()));
-                            }
                             Err(e) => {
-                                error_msg.set(format!("No se pudo conectar al backend: {e}"));
+                                error_msg.set(format!("No se pudo publicar la ruta: {e}"));
                             }
                         }
                         submitting.set(false);

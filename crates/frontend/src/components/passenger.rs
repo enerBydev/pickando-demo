@@ -2,6 +2,8 @@ use dioxus::prelude::*;
 use pickando_shared::models::{MatchRequest, MatchResult, Route};
 use wasm_bindgen::JsCast;
 
+use crate::api;
+
 /// Passenger search page — the core matching feature demo.
 /// - Auto-loads all routes on mount
 /// - Calls POST /api/v1/match with passenger coordinates
@@ -21,12 +23,13 @@ pub fn PassengerPage() -> Element {
     // Auto-load all routes on mount so the page feels alive
     use_effect(move || {
         spawn(async move {
-            if let Ok(resp) = reqwest::get("/api/v1/routes").await {
-                if let Ok(data) = resp.json::<Vec<Route>>().await {
+            match api::fetch_json::<Vec<Route>>("/api/v1/routes").await {
+                Ok(data) => {
                     let count = data.len();
                     all_routes.set(data);
                     status_msg.set(format!("{} rutas cargadas desde el backend", count));
                 }
+                Err(e) => error_msg.set(format!("No se pudieron cargar rutas: {e}")),
             }
         });
     });
@@ -162,27 +165,18 @@ pub fn PassengerPage() -> Element {
                                 radius_km: Some(radius_val),
                             };
 
-                            let client = reqwest::Client::new();
-                            match client.post("/api/v1/match").json(&body).send().await {
-                                Ok(resp) if resp.status().is_success() => {
-                                    match resp.json::<Vec<MatchResult>>().await {
-                                        Ok(data) => {
-                                            let count = data.len();
-                                            matches.set(data);
-                                            status_msg.set(format!(
-                                                "Encontradas {} rutas compatibles en {}km de radio",
-                                                count, radius_val
-                                            ));
-                                        }
-                                        Err(e) => error_msg.set(format!("Error parseando respuesta: {e}")),
-                                    }
+                            match api::post_json::<Vec<MatchResult>, _>("/api/v1/match", &body)
+                                .await
+                            {
+                                Ok(data) => {
+                                    let count = data.len();
+                                    matches.set(data);
+                                    status_msg.set(format!(
+                                        "Encontradas {} rutas compatibles en {}km de radio",
+                                        count, radius_val
+                                    ));
                                 }
-                                Ok(resp) => {
-                                    error_msg.set(format!("Error del servidor: {}", resp.status()));
-                                }
-                                Err(e) => {
-                                    error_msg.set(format!("No se pudo conectar al backend: {e}"));
-                                }
+                                Err(e) => error_msg.set(format!("Error en búsqueda: {e}")),
                             }
                             loading.set(false);
                         },
@@ -255,19 +249,13 @@ pub fn PassengerPage() -> Element {
                         disabled: loading(),
                         onclick: move |_| async move {
                             loading.set(true);
-                            match reqwest::get("/api/v1/routes").await {
-                                Ok(resp) if resp.status().is_success() => {
-                                    match resp.json::<Vec<Route>>().await {
-                                        Ok(data) => {
-                                            let count = data.len();
-                                            all_routes.set(data);
-                                            status_msg.set(format!("{} rutas cargadas", count));
-                                        }
-                                        Err(e) => error_msg.set(format!("Error parseando: {e}")),
-                                    }
+                            match api::fetch_json::<Vec<Route>>("/api/v1/routes").await {
+                                Ok(data) => {
+                                    let count = data.len();
+                                    all_routes.set(data);
+                                    status_msg.set(format!("{} rutas cargadas", count));
                                 }
-                                Ok(resp) => error_msg.set(format!("Error: {}", resp.status())),
-                                Err(e) => error_msg.set(format!("Conexión fallida: {e}")),
+                                Err(e) => error_msg.set(format!("Error: {e}")),
                             }
                             loading.set(false);
                         },
@@ -537,14 +525,8 @@ fn HealthChecker() -> Element {
             disabled: checking(),
             onclick: move |_| async move {
                 checking.set(true);
-                match reqwest::get("/api/v1/health").await {
-                    Ok(resp) if resp.status().is_success() => {
-                        match resp.text().await {
-                            Ok(data) => health.set(data),
-                            Err(e) => health.set(format!("Error leyendo respuesta: {e}")),
-                        }
-                    }
-                    Ok(resp) => health.set(format!("Error HTTP: {}", resp.status())),
+                match api::fetch_text("/api/v1/health").await {
+                    Ok(data) => health.set(data),
                     Err(e) => health.set(format!("No se pudo conectar al backend: {e}")),
                 }
                 checking.set(false);
