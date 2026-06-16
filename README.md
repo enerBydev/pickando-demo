@@ -141,10 +141,14 @@ La app compila a 4 plataformas desde un solo codebase:
 
 | Plataforma | Comando | Output |
 |-----------|---------|--------|
-| Web (WASM) | `dx build --platform web --release` | `dist/` |
+| Web (WASM) | `dx build --platform web --release` | `target/dx/pickando-frontend/release/web/public/` |
 | Linux | `cargo build --release -p pickando-backend` | Binary |
 | Windows | `cargo build --release -p pickando-backend` | `.exe` |
-| Android | `dx android build --release` | `.apk` |
+| Android | Gradle build del proyecto en `android/` | `.apk` (WebView wrapper) |
+
+> **Nota Android**: El APK usa un WebView wrapper que carga la demo desplegada
+> (approach más confiable en CI que `dx build --android` que requiere NDK completo).
+> El proyecto Android está en `android/` y se construye con `./gradlew assembleDebug`.
 
 ---
 
@@ -153,6 +157,10 @@ La app compila a 4 plataformas desde un solo codebase:
 - **CI** (`ci.yml`): Formato, lint, tests, build backend + frontend WASM en cada push
 - **Release** (`release.yml`): Build multi-plataforma + APK Android en cada tag `v*`
 - **Railway**: Deploy automático desde `main`
+
+> **APK pre-compilado**: Cada release `v*` incluye `pickando-demo.apk` ya compilado
+> y firmado, listo para descargar e instalar — sin pasos extra. Ver
+> [Releases](https://github.com/enerBydev/pickando-demo/releases).
 
 ---
 
