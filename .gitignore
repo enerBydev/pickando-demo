@@ -23,7 +23,7 @@ dist/
 .Dioxus/
 
 # Cargo
-Cargo.lock
+# (Cargo.lock IS committed for binary applications — see Cargo.toml workspace)
 
 # Temp
 *.log
