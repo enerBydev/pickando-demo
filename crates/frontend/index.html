@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Pickando — Same-direction local mobility. Rust + Dioxus + Axum." />
     <meta name="theme-color" content="#0D0D11" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <title>{app_title}</title>
     <style>
         /* ===== LOADING SCREEN — auto-hidden once Dioxus mounts into #main ===== */
@@ -133,7 +134,7 @@
     </style>
 </head>
 <body>
-    <!-- Loading screen — Dioxus will mount the app into #main, which triggers our MutationObserver to hide this -->
+    <!-- Loading screen — Dioxus mounts the app into #main, which our watchdog detects -->
     <div id="loading-screen">
         <div class="loading-logo">
             <div class="loading-logo-mark">P</div>
@@ -153,15 +154,17 @@
     <div id="main"></div>
 
     <script>
-        // ===== Loading screen watchdog =====
-        // Dioxus 0.7 injects a module script that initializes the WASM and
-        // mounts the app into #main.
-        //
-        // We poll #main.children.length every 100ms to detect when Dioxus has
-        // mounted something, then hide the loading screen. If after 30s nothing
-        // has mounted, we show a clear error so the user knows WHY the app
-        // didn't load (instead of staying stuck on "Cargando Pickando...").
-
+        // =====================================================================
+        // Loading screen watchdog — robust against multiple failure modes
+        // =====================================================================
+        // The previous version only checked #main.children.length. That fails
+        // if Dioxus 0.7 mounts the app differently (e.g. body, or with a
+        // delayed mount). This version:
+        //   1. Listens for wasm-bindgen's __dx_mainWasm global being set
+        //   2. Polls #main AND body for any Dioxus-managed DOM nodes
+        //   3. Listens for uncaught errors in the WASM init promise
+        //   4. Surfaces a clear error if WASM truly fails to load
+        // =====================================================================
         (function () {
             var status = document.getElementById('loading-status');
             var errorBox = document.getElementById('loading-error');
@@ -170,6 +173,7 @@
             var main = document.getElementById('main');
             var hidden = false;
             var startTime = Date.now();
+            var wasmLoadedAt = null;
 
             function showFatalError(reason, detail) {
                 if (status) status.style.display = 'none';
@@ -195,7 +199,7 @@
                 setTimeout(function () {
                     if (loadingScreen.parentNode) loadingScreen.parentNode.removeChild(loadingScreen);
                 }, 400);
-                console.log('[Pickando] App mounted, loading screen hidden');
+                console.log('[Pickando] App mounted, loading screen hidden after ' + (Date.now() - startTime) + 'ms');
             }
 
             // Detect WASM support early
@@ -207,31 +211,83 @@
                 return;
             }
 
-            // Poll #main for Dioxus mounting
+            // Listen for uncaught errors — most likely cause of stuck loading
+            // is a WASM init failure that rejects silently.
+            window.addEventListener('error', function (event) {
+                // Only treat as fatal if it's clearly a WASM/resource error
+                if (event.message && (
+                    event.message.indexOf('CompileError') >= 0 ||
+                    event.message.indexOf('LinkError') >= 0 ||
+                    event.message.indexOf('wasm') >= 0 ||
+                    event.message.indexOf('WASM') >= 0 ||
+                    event.message.indexOf('Dioxus') >= 0 ||
+                    event.message.indexOf('dioxus') >= 0
+                )) {
+                    showFatalError(
+                        'Error durante la inicializacion de la app.',
+                        String(event.message || 'Unknown error') + '\n' +
+                        String(event.error && event.error.stack ? event.error.stack : '')
+                    );
+                }
+            });
+
+            window.addEventListener('unhandledrejection', function (event) {
+                var reasonStr = '';
+                try { reasonStr = String(event.reason && event.reason.message ? event.reason.message : event.reason); }
+                catch (e) { reasonStr = 'unknown'; }
+                if (reasonStr.indexOf('wasm') >= 0 || reasonStr.indexOf('WASM') >= 0 ||
+                    reasonStr.indexOf('dioxus') >= 0 || reasonStr.indexOf('Dioxus') >= 0 ||
+                    reasonStr.indexOf('fetch') >= 0) {
+                    showFatalError('Error al cargar el WASM o inicializar Dioxus.', reasonStr);
+                }
+            });
+
+            // Poll for app mount — check #main AND body for Dioxus content,
+            // and also check for the __dx_mainWasm global being set (which
+            // means the WASM has loaded and main() has been called).
             var pollInterval = setInterval(function () {
                 if (hidden) {
                     clearInterval(pollInterval);
                     return;
                 }
+                // Sign 1: #main has children
                 if (main && main.children && main.children.length > 0) {
                     clearInterval(pollInterval);
                     hideLoadingScreen();
                     return;
                 }
+                // Sign 2: WASM has loaded — set a marker but give Dioxus 2s
+                // to mount before declaring it stuck
+                if (window.__dx_mainWasm && !wasmLoadedAt) {
+                    wasmLoadedAt = Date.now();
+                }
+                // Sign 3: WASM loaded 2s ago — Dioxus must have mounted by now
+                // even if not into #main. Look for any [data-dioxus-id] attribute
+                // anywhere in the body.
+                if (wasmLoadedAt && (Date.now() - wasmLoadedAt) > 2000) {
+                    var dioxusNodes = document.querySelectorAll('[data-dioxus-id]');
+                    if (dioxusNodes.length > 0) {
+                        clearInterval(pollInterval);
+                        hideLoadingScreen();
+                        return;
+                    }
+                }
             }, 100);
 
-            // Safety net: if after 30s the loading screen is still visible, surface an error
+            // Safety net: if after 30s the loading screen is still visible,
+            // surface a clear error so the user knows WHY the app didn't load
+            // (instead of staying stuck on "Cargando Pickando...").
             setTimeout(function () {
                 if (!hidden && loadingScreen && loadingScreen.parentNode) {
                     clearInterval(pollInterval);
-                    showFatalError(
-                        'La aplicacion tardo demasiado en iniciar.',
-                        'Timeout after 30 seconds.\n' +
+                    var diag = 'Timeout after 30 seconds.\n' +
                         'Elapsed: ' + (Date.now() - startTime) + 'ms\n' +
                         '#main children: ' + (main ? main.children.length : 'no #main') + '\n' +
+                        'WASM loaded: ' + (window.__dx_mainWasm ? 'yes' : 'no') + '\n' +
+                        'Dioxus nodes in body: ' + document.querySelectorAll('[data-dioxus-id]').length + '\n' +
                         'The WASM file may be too large, the connection too slow, or main.js failed to load.\n' +
-                        'Check the browser console (F12) for errors.'
-                    );
+                        'Check the browser console (F12) for errors.';
+                    showFatalError('La aplicacion tardo demasiado en iniciar.', diag);
                 }
             }, 30000);
         })();

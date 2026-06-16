@@ -56,10 +56,23 @@ RUN rustup target add wasm32-unknown-unknown
 RUN cd crates/frontend && dx build --platform web --release
 
 # Dioxus 0.7 outputs to target/dx/<crate>/release/web/public/
+# CRITICAL: Dioxus 0.7 does NOT copy main.css from the asset_dir to the build
+# output even though it injects a <link rel="stylesheet" href="/assets/main.css">
+# tag into the built index.html. We must copy it manually or the browser gets
+# a 404 for /assets/main.css and the page renders unstyled (and may appear
+# stuck on the loading screen if the WASM also fails to mount).
+RUN mkdir -p /app/target/dx/pickando-frontend/release/web/public/assets && \
+    cp /app/crates/frontend/assets/main.css \
+       /app/target/dx/pickando-frontend/release/web/public/assets/main.css && \
+    cp /app/crates/frontend/assets/favicon.svg \
+       /app/target/dx/pickando-frontend/release/web/public/assets/favicon.svg
+
 # Verify the expected output files exist — fail loudly if missing
 RUN test -f /app/target/dx/pickando-frontend/release/web/public/index.html && \
-    echo "[OK] index.html present" && \
-    ls -la /app/target/dx/pickando-frontend/release/web/public/
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/main.css && \
+    echo "[OK] index.html + main.css present" && \
+    ls -la /app/target/dx/pickando-frontend/release/web/public/ && \
+    ls -la /app/target/dx/pickando-frontend/release/web/public/assets/
 
 # ---------- Stage 2: Runtime ----------
 FROM debian:bookworm-slim

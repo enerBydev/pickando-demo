@@ -161,13 +161,27 @@ jobs:
       - name: Build frontend for web
         run: cd crates/frontend && dx build --platform web --release
 
+      - name: Copy main.css to build output
+        # Dioxus 0.7 does NOT copy main.css from asset_dir to the build output
+        # even though it injects a <link> tag for /assets/main.css into index.html.
+        # Without this copy, the browser gets a 404 and the page renders unstyled.
+        run: |
+          DIST_DIR="target/dx/pickando-frontend/release/web/public"
+          mkdir -p "$DIST_DIR/assets"
+          cp crates/frontend/assets/main.css "$DIST_DIR/assets/main.css"
+          cp crates/frontend/assets/favicon.svg "$DIST_DIR/assets/favicon.svg"
+          echo "main.css + favicon.svg copied to $DIST_DIR/assets/"
+
       - name: Verify dist contains expected files
         run: |
           DIST_DIR="target/dx/pickando-frontend/release/web/public"
           test -f "$DIST_DIR/index.html"
+          test -f "$DIST_DIR/assets/main.css"
+          test -f "$DIST_DIR/assets/favicon.svg"
           test -n "$(find "$DIST_DIR" -name '*.wasm')"
           echo "WASM bundle OK at $DIST_DIR"
           ls -la "$DIST_DIR"
+          ls -la "$DIST_DIR/assets"
 
       - name: Upload frontend dist
         uses: actions/upload-artifact@v4
