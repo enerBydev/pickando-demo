@@ -170,7 +170,7 @@ pub fn DriverPage() -> Element {
                             div { class: "placeholder-lines" }
                         }
                     }
-                    span { class: "feature-tag placeholder", "TODO M2" }
+                    span { class: "feature-tag placeholder", "Proximo" }
                 }
             }
         }
