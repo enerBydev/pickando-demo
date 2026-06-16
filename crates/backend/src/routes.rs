@@ -107,19 +107,16 @@ pub async fn join_route(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<WsMessage>, (StatusCode, Json<WsMessage>)> {
     let mut routes = state.routes.write().await;
-    let route = routes
-        .iter_mut()
-        .find(|r| r.id == id)
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(WsMessage {
-                    msg_type: "error".into(),
-                    message: format!("Route {id} not found"),
-                    data: None,
-                }),
-            )
-        })?;
+    let route = routes.iter_mut().find(|r| r.id == id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(WsMessage {
+                msg_type: "error".into(),
+                message: format!("Route {id} not found"),
+                data: None,
+            }),
+        )
+    })?;
 
     if route.seats_available == 0 {
         return Err((
@@ -133,7 +130,10 @@ pub async fn join_route(
     }
 
     route.seats_available -= 1;
-    tracing::info!("Passenger joined route {id}, seats left: {}", route.seats_available);
+    tracing::info!(
+        "Passenger joined route {id}, seats left: {}",
+        route.seats_available
+    );
 
     Ok(Json(WsMessage {
         msg_type: "joined".into(),

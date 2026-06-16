@@ -29,6 +29,8 @@ fn main() {
 #[derive(Clone, Copy, PartialEq)]
 enum Page {
     Home,
+    Login,
+    Dashboard,
     Driver,
     Passenger,
     About,
@@ -43,22 +45,37 @@ fn App() -> Element {
         document::Meta { name: "description", content: "Pickando — Same-direction local mobility" }
         document::Meta { name: "viewport", content: "width=device-width, initial-scale=1.0" }
 
-        div { class: "app-container",
-            // Navbar
-            Navbar { active_page: active_page(), on_navigate: move |page: Page| active_page.set(page) }
+        // Login and Dashboard pages have their own full-screen layout (no navbar/footer)
+        if matches!(active_page(), Page::Login) {
+            {rsx! {
+                LoginPage { on_navigate: move |page: Page| active_page.set(page) }
+            }}
+        } else if matches!(active_page(), Page::Dashboard) {
+            {rsx! {
+                DashboardPage { on_navigate: move |page: Page| active_page.set(page) }
+            }}
+        } else {
+            {rsx! {
+                div { class: "app-container",
+                    // Navbar
+                    Navbar { active_page: active_page(), on_navigate: move |page: Page| active_page.set(page) }
 
-            // Page content
-            main { class: "main-content",
-                match active_page() {
-                    Page::Home => rsx! { LandingPage { on_navigate: move |page: Page| active_page.set(page) } },
-                    Page::Driver => rsx! { DriverPage {} },
-                    Page::Passenger => rsx! { PassengerPage {} },
-                    Page::About => rsx! { AboutPage {} },
+                    // Page content
+                    main { class: "main-content",
+                        match active_page() {
+                            Page::Home => rsx! { LandingPage { on_navigate: move |page: Page| active_page.set(page) } },
+                            Page::Driver => rsx! { DriverPage {} },
+                            Page::Passenger => rsx! { PassengerPage {} },
+                            Page::About => rsx! { AboutPage {} },
+                            Page::Login => rsx! {},
+                            Page::Dashboard => rsx! {},
+                        }
+                    }
+
+                    // Footer
+                    Footer {}
                 }
-            }
-
-            // Footer
-            Footer {}
+            }}
         }
     }
 }

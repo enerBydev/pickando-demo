@@ -13,7 +13,11 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::from_default_env().add_directive("pickando=info".parse().expect("invalid log filter directive")),
+            EnvFilter::from_default_env().add_directive(
+                "pickando=info"
+                    .parse()
+                    .expect("invalid log filter directive"),
+            ),
         )
         .init();
 
@@ -55,6 +59,8 @@ async fn main() {
     tracing::info!("WebSocket: ws://{addr}/ws");
     tracing::info!("Static files: {static_dir}");
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.expect("failed to bind TCP listener");
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .expect("failed to bind TCP listener");
     axum::serve(listener, app).await.expect("server error");
 }
