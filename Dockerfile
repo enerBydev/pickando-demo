@@ -14,7 +14,12 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------- Cache cargo registry separately ----------
+# ---------- Pre-install dioxus-cli as a separate cached layer ----------
+# This is a 30+ minute compile, so we cache it independently of source code.
+# Source: https://github.com/DioxusLabs/dioxus/releases (v0.7.9)
+RUN cargo install dioxus-cli --version 0.7.9 --locked
+
+# ---------- Cache cargo deps separately ----------
 # Copy only manifests so we can cache the dependency build layer
 COPY Cargo.toml Cargo.lock* ./
 COPY crates/shared/Cargo.toml crates/shared/Cargo.toml
@@ -36,6 +41,7 @@ COPY crates/shared/src/ crates/shared/src/
 COPY crates/backend/src/ crates/backend/src/
 COPY crates/frontend/src/ crates/frontend/src/
 COPY crates/frontend/assets/ crates/frontend/assets/
+COPY crates/frontend/index.html crates/frontend/index.html
 
 # Touch source files to invalidate cache for our crates only
 RUN find crates -name "*.rs" -exec touch {} +
@@ -46,11 +52,7 @@ RUN cargo build --release -p pickando-backend
 # ---------- Build frontend WASM ----------
 RUN rustup target add wasm32-unknown-unknown
 
-# Install dioxus-cli with --locked to avoid registry drift.
-# We do NOT swallow errors here — if dx fails, the build fails loudly.
-RUN cargo install dioxus-cli --version 0.7.9 --locked
-
-# Build the WASM bundle. If this fails, the Docker build fails.
+# Build the WASM bundle. If this fails, the Docker build fails loudly.
 RUN cd crates/frontend && dx build --platform web --release
 
 # Verify the expected output files exist — fail loudly if missing

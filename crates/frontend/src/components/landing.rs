@@ -5,8 +5,6 @@ use crate::Page;
 /// Public marketing landing page — shown to first-time visitors.
 /// This page is intentionally distinct from the platform shell:
 /// it has its own header, hero, and CTA to "enter the platform".
-///
-/// No M1/M2/Helder references — neutral demo language only.
 #[component]
 pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
     rsx! {

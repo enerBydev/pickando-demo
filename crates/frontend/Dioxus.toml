@@ -9,9 +9,6 @@ asset_dir = "assets"
 title = "Pickando — Same-Direction Local Mobility"
 base_path = "/"
 
-# Use our custom index.html with diagnostic loading screen
-index_html = "assets/index.html"
-
 [web.watcher]
 watch_path = ["src", "assets"]
 
