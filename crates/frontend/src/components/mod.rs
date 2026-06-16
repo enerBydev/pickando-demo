@@ -8,6 +8,6 @@ mod passenger;
 pub use about::AboutPage;
 pub use driver::DriverPage;
 pub use footer::Footer;
-pub use landing::LandingPage;
+pub use landing::{LandingPage, PlatformHome};
 pub use navbar::Navbar;
 pub use passenger::PassengerPage;

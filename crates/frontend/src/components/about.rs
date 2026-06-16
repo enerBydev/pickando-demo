@@ -8,7 +8,7 @@ pub fn AboutPage() -> Element {
             div { class: "page-header",
                 h1 { "Acerca de esta Demo" }
                 p { class: "page-subtitle",
-                    "Proof of execution — no es MVP, no es M1, es el esqueleto andando"
+                    "Demo funcional — Rust + Dioxus + Axum, todo el stack en un solo lenguaje"
                 }
             }
 
@@ -26,7 +26,7 @@ pub fn AboutPage() -> Element {
                         span { class: "demo-status real", "✓" }
                         div {
                             h4 { "Backend Axum funcional" }
-                            p { "GET /api/v1/health responde JSON. GET /api/v1/routes devuelve rutas. POST /api/v1/match ejecuta matching." }
+                            p { "GET /api/v1/health responde JSON. GET /api/v1/routes devuelve rutas. POST /api/v1/routes persiste nuevas rutas. POST /api/v1/match ejecuta matching." }
                         }
                     }
                     div { class: "demo-item real",
@@ -39,8 +39,8 @@ pub fn AboutPage() -> Element {
                     div { class: "demo-item real",
                         span { class: "demo-status real", "✓" }
                         div {
-                            h4 { "WebSocket bidireccional" }
-                            p { "Conexión ws:// persistente con echo server. Demostración de comunicación en tiempo real." }
+                            h4 { "WebSocket bidireccional en vivo" }
+                            p { "Conexión ws:// persistente con echo + ticks cada 5 segundos. Demostración visible en la tab \"WebSocket en vivo\"." }
                         }
                     }
                     div { class: "demo-item real",
@@ -68,48 +68,41 @@ pub fn AboutPage() -> Element {
             }
 
             div { class: "card",
-                h2 { "¿Qué es placeholder / TODO?" }
+                h2 { "¿Qué es placeholder?" }
                 div { class: "demo-list",
                     div { class: "demo-item placeholder",
                         span { class: "demo-status placeholder", "○" }
                         div {
                             h4 { "Base de datos PostgreSQL" }
-                            p { "Los datos están en memoria. PostgreSQL con sqlx se implementa en M2." }
+                            p { "Los datos están en memoria (RwLock + AtomicU64). Para una demo es suficiente y mucho más simple de desplegar." }
                         }
                     }
                     div { class: "demo-item placeholder",
                         span { class: "demo-status placeholder", "○" }
                         div {
                             h4 { "Autenticación JWT + OTP" }
-                            p { "No hay login. Autenticación real se implementa en M2." }
+                            p { "No hay login. La autenticación real se agregará cuando se mueva a un entorno productivo." }
                         }
                     }
                     div { class: "demo-item placeholder",
                         span { class: "demo-status placeholder", "○" }
                         div {
                             h4 { "Matching por dirección" }
-                            p { "Solo matching por proximidad (geohash). Matching por dirección similar en M2." }
+                            p { "Solo matching por proximidad (geohash). El matching por dirección similar se puede agregar al shared crate." }
                         }
                     }
                     div { class: "demo-item placeholder",
                         span { class: "demo-status placeholder", "○" }
                         div {
                             h4 { "GPS tracking en vivo" }
-                            p { "WebSocket hace echo. GPS streaming en tiempo real en M2." }
+                            p { "WebSocket hace echo + ticks. El GPS streaming real se puede agregar sobre la misma conexión." }
                         }
                     }
                     div { class: "demo-item placeholder",
                         span { class: "demo-status placeholder", "○" }
                         div {
                             h4 { "Pagos" }
-                            p { "Stripe / MercadoPago. Se implementa en M3." }
-                        }
-                    }
-                    div { class: "demo-item placeholder",
-                        span { class: "demo-status placeholder", "○" }
-                        div {
-                            h4 { "UI/UX final" }
-                            p { "CSS funcional pero básico. Diseño profesional completo en M3." }
+                            p { "Stripe / MercadoPago. No incluido en la demo." }
                         }
                     }
                 }
@@ -117,26 +110,29 @@ pub fn AboutPage() -> Element {
 
             div { class: "card",
                 h2 { "Código Reutilizable vs Demo" }
+                p { class: "form-note",
+                    "Todo el código está escrito para ser reutilizable en un proyecto productivo."
+                }
                 table { class: "reuse-table",
                     thead {
                         tr {
                             th { "Componente" }
                             th { "Reutilizable" }
-                            th { "Se reemplaza en" }
+                            th { "Notas" }
                         }
                     }
                     tbody {
-                        tr { td { "shared/models.rs" } td { class: "yes", "Sí" } td { "Se amplía en M2" } }
-                        tr { td { "shared/matching.rs" } td { class: "yes", "Sí" } td { "Se amplía en M2" } }
-                        tr { td { "backend/routes.rs" } td { class: "yes", "Sí" } td { "Se amplía en M2" } }
-                        tr { td { "backend/ws.rs" } td { class: "yes", "Sí" } td { "Se amplía en M2" } }
-                        tr { td { "backend/state.rs" } td { class: "partial", "Parcial" } td { "PgPool en M2" } }
-                        tr { td { "frontend/components" } td { class: "yes", "Sí" } td { "Se amplía en M3" } }
-                        tr { td { "frontend/pages" } td { class: "partial", "Parcial" } td { "Lógica real en M2" } }
-                        tr { td { "Datos de prueba" } td { class: "no", "No" } td { "PostgreSQL en M2" } }
-                        tr { td { "CSS" } td { class: "partial", "Parcial" } td { "Design system en M3" } }
-                        tr { td { "Dockerfile" } td { class: "yes", "Sí" } td { "Se optimiza en M5" } }
-                        tr { td { "CI/CD" } td { class: "yes", "Sí" } td { "Se amplía en M5" } }
+                        tr { td { "shared/models.rs" } td { class: "yes", "Sí" } td { "Tipos serde listos para PostgreSQL" } }
+                        tr { td { "shared/matching.rs" } td { class: "yes", "Sí" } td { "Algoritmo puro, sin dependencias" } }
+                        tr { td { "backend/routes.rs" } td { class: "yes", "Sí" } td { "Handlers Axum limpios" } }
+                        tr { td { "backend/ws.rs" } td { class: "yes", "Sí" } td { "Echo + live ticks, extensible" } }
+                        tr { td { "backend/state.rs" } td { class: "partial", "Parcial" } td { "Cambia a PgPool para producción" } }
+                        tr { td { "frontend/components" } td { class: "yes", "Sí" } td { "Componentes Dioxus reutilizables" } }
+                        tr { td { "frontend/pages" } td { class: "yes", "Sí" } td { "Lógica de negocio conectada al API" } }
+                        tr { td { "Datos de prueba" } td { class: "no", "No" } td { "Sembrados en main(), reemplazables" } }
+                        tr { td { "CSS" } td { class: "yes", "Sí" } td { "Design system completo" } }
+                        tr { td { "Dockerfile" } td { class: "yes", "Sí" } td { "Multi-stage, optimizado" } }
+                        tr { td { "CI/CD" } td { class: "yes", "Sí" } td { "GitHub Actions + APK" } }
                     }
                 }
             }

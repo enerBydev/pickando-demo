@@ -1,21 +1,20 @@
-# Pickando Demo — Same-Direction Local Mobility
+# Pickando — Same-Direction Local Mobility Demo
 
-> **Proof of execution** — no es MVP, no es M1, es el esqueleto andando.  
-> Demuestra que Rust + Dioxus compila a WASM, Axum sirve API, y el matching funciona.
+> Demo funcional en Rust puro: Dioxus 0.7 + Axum 0.8 + WebAssembly.
+> Matching inteligente, WebSocket en vivo, multi-plataforma desde un solo codebase.
 
 ---
 
-## Stack Tecnológico
+## Stack
 
-| Componente | Tecnología | Versión |
-|-----------|-----------|---------|
-| Lenguaje | Rust | 1.96.0 |
-| Frontend | Dioxus | 0.7.9 |
-| Backend | Axum | 0.8.9 |
-| Runtime | Tokio | 1.52.3 |
-| Serialización | Serde | 1.0.228 |
-| Matching | Geohash + Haversine | Rust puro |
-| Deploy | Railway + GitHub Actions | — |
+| Componente | Tecnología |
+|-----------|-----------|
+| Lenguaje | Rust 1.96 |
+| Frontend | Dioxus 0.7 (WASM) |
+| Backend | Axum 0.8 + Tokio |
+| Matching | Geohash + Haversine (Rust puro) |
+| Real-time | WebSocket bidireccional |
+| Deploy | Railway + GitHub Actions |
 
 ---
 
@@ -24,7 +23,7 @@
 ```
 pickando-demo/
 ├── crates/
-│   ├── shared/       # Modelos + motor de matching (reutilizable)
+│   ├── shared/       # Modelos + motor de matching
 │   ├── backend/      # API REST + WebSocket (Axum)
 │   └── frontend/     # App Dioxus (Web WASM / Desktop / Android)
 ├── .github/workflows/ # CI/CD multi-plataforma
@@ -36,22 +35,21 @@ pickando-demo/
 ```
 [Browser/WASM] → REST API → [Axum Server] → Matching Engine → [Result]
 [Browser/WASM] ← JSON ←    [Axum Server] ← Geohash+Haversine ← [Result]
-[Mobile/Desktop] → WebSocket → [Axum Server] → Echo/Tracking → [Result]
+[Browser/WASM] ↔ WebSocket ↔ [Axum Server] ↔ Echo + Live ticks
 ```
 
 ---
 
-## Compilación Rápida
+## Compilación rápida
 
 ### Requisitos
 - Rust 1.96+ (`rustup.rs`)
-- Dioxus CLI 0.7.9 (`cargo install dioxus-cli --version 0.7.9`)
+- Dioxus CLI 0.7.9 (`cargo install dioxus-cli --version 0.7.9 --locked`)
 
 ### Backend (API REST + WebSocket)
 
 ```bash
-cd crates/backend
-cargo run
+cargo run -p pickando-backend
 # → http://localhost:3000
 ```
 
@@ -63,7 +61,7 @@ dx serve
 # → http://localhost:8080
 ```
 
-### Docker
+### Docker (todo en uno)
 
 ```bash
 docker build -t pickando-demo .
@@ -73,8 +71,8 @@ docker run -p 3000:3000 pickando-demo
 
 ### Railway
 
-1. Conectar repo `enerbydev/pickando-demo` en Railway
-2. Railway detecta `Dockerfile` automáticamente
+1. Conectar el repo en Railway
+2. Railway detecta el `Dockerfile` automáticamente
 3. Deploy automático en cada push a `main`
 4. URL pública generada por Railway
 
@@ -84,11 +82,11 @@ docker run -p 3000:3000 pickando-demo
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/v1/health` | Health check con uptime |
-| GET | `/api/v1/routes` | Listar rutas de prueba |
-| POST | `/api/v1/routes` | Crear ruta (placeholder) |
-| POST | `/api/v1/match` | Buscar rutas compatibles |
-| GET | `/ws` | WebSocket (echo server) |
+| GET | `/api/v1/health` | Health check con uptime y rutas activas |
+| GET | `/api/v1/routes` | Listar rutas (sembradas + creadas en runtime) |
+| POST | `/api/v1/routes` | Crear nueva ruta (persiste en memoria) |
+| POST | `/api/v1/match` | Buscar rutas compatibles por ubicación |
+| GET | `/ws` | WebSocket bidireccional con echo + live ticks |
 
 ### Ejemplo: Health Check
 
@@ -100,9 +98,10 @@ curl https://pickando-demo.up.railway.app/api/v1/health
 {
   "status": "ok",
   "service": "pickando-backend",
-  "version": "0.1.0-proof",
+  "version": "0.1.0",
   "stack": "Rust + Axum 0.8 + Tokio 1.52",
-  "uptime_seconds": 42.5
+  "uptime_seconds": 42.5,
+  "routes_count": 6
 }
 ```
 
@@ -114,30 +113,25 @@ curl -X POST https://pickando-demo.up.railway.app/api/v1/match \
   -d '{"lat": 19.4326, "lng": -99.1332, "radius_km": 5}'
 ```
 
+### Ejemplo: Crear ruta
+
+```bash
+curl -X POST https://pickando-demo.up.railway.app/api/v1/routes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin_address": "Zócalo, CDMX",
+    "dest_address": "Polanco, CDMX",
+    "departure_time": "08:00",
+    "seats_available": 3
+  }'
+```
+
 ### Ejemplo: WebSocket
 
 ```bash
 wscat -c wss://pickando-demo.up.railway.app/ws
-# Envia cualquier mensaje y recibirás echo + confirmación
+# Recibirás: welcome, tick cada 5s, y echo de todo lo que envíes
 ```
-
----
-
-## Código Reutilizable vs Demo
-
-| Componente | Reutilizable | Se reemplaza en |
-|-----------|-------------|-----------------|
-| `shared/models.rs` | ✅ Sí | Se amplía en M2 |
-| `shared/matching.rs` | ✅ Sí | Se amplía en M2 |
-| `backend/routes.rs` | ✅ Sí | Se amplía en M2 |
-| `backend/ws.rs` | ✅ Sí | Se amplía en M2 |
-| `backend/state.rs` | ⚠️ Parcial | PgPool en M2 |
-| `frontend/components` | ✅ Sí | Se amplía en M3 |
-| `frontend/pages` | ⚠️ Parcial | Lógica real en M2 |
-| Datos de prueba | ❌ No | PostgreSQL en M2 |
-| CSS | ⚠️ Parcial | Design system en M3 |
-| Dockerfile | ✅ Sí | Se optimiza en M5 |
-| CI/CD | ✅ Sí | Se amplía en M5 |
 
 ---
 
@@ -156,12 +150,24 @@ La app compila a 4 plataformas desde un solo codebase:
 
 ## CI/CD
 
-- **CI** (`ci.yml`): Formato, lint, tests, build backend + frontend web en cada push
-- **Release** (`release.yml`): Build multi-plataforma (Linux, Windows, Web, Android) en cada tag `v*`
-- **Railway**: Deploy automático desde `main` branch
+- **CI** (`ci.yml`): Formato, lint, tests, build backend + frontend WASM en cada push
+- **Release** (`release.yml`): Build multi-plataforma + APK Android en cada tag `v*`
+- **Railway**: Deploy automático desde `main`
+
+---
+
+## Demo en vivo
+
+La demo incluye datos sembrados (6 rutas en CDMX y Monterrey) para que se sienta viva desde el primer momento. La UI:
+
+- **Landing page**: hero, features, stack, CTAs — separada de la plataforma
+- **Plataforma**: navbar + 4 secciones (Inicio, Conductor, Pasajero, Acerca de)
+- **Conductor**: formulario que llama `POST /api/v1/routes` + lista de rutas en vivo
+- **Pasajero**: matching con geohash+Haversine, lista de rutas, WebSocket visual, status
+- **WebSocket en vivo**: conexión real con el backend, mensajes en tiempo real
 
 ---
 
 ## Licencia
 
-MIT — Demo sin costo, sin compromiso. Built by René Mendoza (enerBydev).
+MIT — Demo sin costo, sin compromiso.

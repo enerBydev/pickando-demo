@@ -1,4 +1,4 @@
-use axum::{Router, routing::get, routing::post};
+use axum::{routing::get, routing::post, Router};
 use pickando_shared::matching::encode_geohash;
 use pickando_shared::models::Route;
 use std::sync::Arc;
@@ -18,7 +18,9 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("pickando=info".parse().unwrap()))
+        .with_env_filter(
+            EnvFilter::from_default_env().add_directive("pickando=info".parse().unwrap()),
+        )
         .init();
 
     let start_time = Instant::now();
@@ -48,13 +50,20 @@ async fn main() {
     tracing::info!("Health check: http://{addr}/api/v1/health");
     tracing::info!("WebSocket: ws://{addr}/ws");
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("Failed to bind to {addr}: {e}");
+            std::process::exit(1);
+        });
+    if let Err(e) = axum::serve(listener, app).await {
+        tracing::error!("Server error: {e}");
+        std::process::exit(1);
+    }
 }
 
 /// Initialize sample routes with real CDMX and Monterrey coordinates.
-/// These are used by the demo to show matching in action.
-/// TODO in M2: Replace with PostgreSQL-backed data.
+/// These seed the in-memory store so the demo feels alive from second one.
 fn init_sample_routes() -> Vec<Route> {
     use pickando_shared::models::RouteStatus;
 
@@ -66,9 +75,9 @@ fn init_sample_routes() -> Vec<Route> {
             origin_lng: -99.1332,
             dest_lat: 19.4512,
             dest_lng: -99.1100,
-            origin_address: "Zocalo, CDMX".into(),
+            origin_address: "Zócalo, CDMX".into(),
             dest_address: "Polanco, CDMX".into(),
-            departure_time: "2026-06-16T08:00:00".into(),
+            departure_time: "2026-06-17T08:00:00".into(),
             seats_available: 3,
             status: RouteStatus::Published,
             geohash: encode_geohash(19.4326, -99.1332, 6),
@@ -81,8 +90,8 @@ fn init_sample_routes() -> Vec<Route> {
             dest_lat: 19.4680,
             dest_lng: -99.1530,
             origin_address: "Alameda Central, CDMX".into(),
-            dest_address: "Satelite, EdoMex".into(),
-            departure_time: "2026-06-16T09:00:00".into(),
+            dest_address: "Satélite, EdoMex".into(),
+            departure_time: "2026-06-17T09:00:00".into(),
             seats_available: 2,
             status: RouteStatus::Published,
             geohash: encode_geohash(19.4284, -99.1276, 6),
@@ -95,8 +104,8 @@ fn init_sample_routes() -> Vec<Route> {
             dest_lat: 19.4700,
             dest_lng: -99.1200,
             origin_address: "Reforma, CDMX".into(),
-            dest_address: "Coyoacan, CDMX".into(),
-            departure_time: "2026-06-16T07:30:00".into(),
+            dest_address: "Coyoacán, CDMX".into(),
+            departure_time: "2026-06-17T07:30:00".into(),
             seats_available: 4,
             status: RouteStatus::Published,
             geohash: encode_geohash(19.4420, -99.1450, 6),
@@ -109,11 +118,39 @@ fn init_sample_routes() -> Vec<Route> {
             dest_lat: 25.6700,
             dest_lng: -100.3100,
             origin_address: "Monterrey Centro".into(),
-            dest_address: "San Pedro Garza Garcia".into(),
-            departure_time: "2026-06-16T07:30:00".into(),
+            dest_address: "San Pedro Garza García".into(),
+            departure_time: "2026-06-17T07:30:00".into(),
             seats_available: 1,
             status: RouteStatus::Published,
             geohash: encode_geohash(25.6487, -100.4412, 6),
+        },
+        Route {
+            id: "route-005".into(),
+            driver_id: "driver-005".into(),
+            origin_lat: 19.3550,
+            origin_lng: -99.1420,
+            dest_lat: 19.4100,
+            dest_lng: -99.1700,
+            origin_address: "Tlalpan, CDMX".into(),
+            dest_address: "Roma Norte, CDMX".into(),
+            departure_time: "2026-06-17T18:00:00".into(),
+            seats_available: 2,
+            status: RouteStatus::Published,
+            geohash: encode_geohash(19.3550, -99.1420, 6),
+        },
+        Route {
+            id: "route-006".into(),
+            driver_id: "driver-006".into(),
+            origin_lat: 19.4840,
+            origin_lng: -99.1120,
+            dest_lat: 19.4260,
+            dest_lng: -99.1670,
+            origin_address: "Indios Verdes, CDMX".into(),
+            dest_address: "Condesa, CDMX".into(),
+            departure_time: "2026-06-17T17:30:00".into(),
+            seats_available: 3,
+            status: RouteStatus::Published,
+            geohash: encode_geohash(19.4840, -99.1120, 6),
         },
     ]
 }

@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+/// Platform footer — shown inside the platform shell (not on landing).
 #[component]
 pub fn Footer() -> Element {
     rsx! {
@@ -7,7 +8,7 @@ pub fn Footer() -> Element {
             div { class: "footer-inner",
                 div { class: "footer-brand",
                     span { class: "footer-logo", "Pickando" }
-                    span { class: "footer-tagline", "Same-direction local mobility" }
+                    span { class: "footer-tagline", "Same-direction local mobility · Demo" }
                 }
 
                 div { class: "footer-tech",
@@ -22,8 +23,7 @@ pub fn Footer() -> Element {
 
                 div { class: "footer-info",
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-author", "Built by René Mendoza — enerBydev" }
-                    p { class: "footer-version", "v0.1.0-proof — Junio 2026" }
+                    p { class: "footer-version", "v0.1.0 — Junio 2026" }
                 }
             }
         }

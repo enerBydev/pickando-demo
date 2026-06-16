@@ -9,36 +9,40 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   check:
-    name: Check & Lint
+    name: Check · Lint · Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust 1.96 toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.96.0
           components: rustfmt, clippy
 
-      - name: Cache cargo registry
+      - name: Cache cargo registry + build artifacts
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-check-
+            ${{ runner.os }}-cargo-
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Clippy lint
+      - name: Clippy lint (deny warnings)
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Check compilation
+      - name: cargo check
         run: cargo check --workspace
 
   test:
@@ -48,10 +52,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust 1.96 toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
 
-      - name: Cache cargo registry
+      - name: Cache cargo registry + build artifacts
         uses: actions/cache@v4
         with:
           path: |
@@ -59,28 +65,59 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-test-
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+            ${{ runner.os }}-cargo-
 
       - name: Run tests
         run: cargo test --workspace --verbose
 
   build-backend:
-    name: Build Backend
+    name: Build Backend (Linux)
     runs-on: ubuntu-latest
     needs: test
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust 1.96 toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
 
-      - name: Build backend
+      - name: Cache cargo registry + build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-backend-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-backend-
+            ${{ runner.os }}-cargo-
+
+      - name: Build backend (release)
         run: cargo build --release -p pickando-backend
+
+      - name: Smoke-test backend binary
+        run: |
+          ./target/release/pickando-backend &
+          SERVER_PID=$!
+          sleep 2
+          # Health check should return 200
+          curl -sf http://localhost:3000/api/v1/health | jq -e '.status == "ok"'
+          # Routes should be a non-empty array
+          curl -sf http://localhost:3000/api/v1/routes | jq -e 'length > 0'
+          # Match endpoint should return matches
+          curl -sf -X POST http://localhost:3000/api/v1/match \
+            -H "Content-Type: application/json" \
+            -d '{"lat": 19.4326, "lng": -99.1332, "radius_km": 5}' | jq -e 'length > 0'
+          kill $SERVER_PID
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pickando-backend
+          name: pickando-backend-linux
           path: target/release/pickando-backend
 
   build-frontend-web:
@@ -90,17 +127,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Rust 1.96 toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
 
-      - name: Install WASM target
+      - name: Add WASM target
         run: rustup target add wasm32-unknown-unknown
 
-      - name: Install Dioxus CLI
-        run: cargo install dioxus-cli --version 0.7.9
+      - name: Cache cargo registry + build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+            ${{ runner.os }}-cargo-
+
+      - name: Cache dioxus-cli binary
+        uses: actions/cache@v4
+        id: dioxus-cache
+        with:
+          path: ~/.cargo/bin/dx
+          key: dioxus-cli-0.7.9-${{ runner.os }}
+
+      - name: Install dioxus-cli (cached)
+        if: steps.dioxus-cache.outputs.cache-hit != 'true'
+        run: cargo install dioxus-cli --version 0.7.9 --locked
 
       - name: Build frontend for web
         run: cd crates/frontend && dx build --platform web --release
+
+      - name: Verify dist contains expected files
+        run: |
+          test -f crates/frontend/dist/index.html
+          test -n "$(ls crates/frontend/dist/*.wasm 2>/dev/null)" || \
+            test -n "$(ls crates/frontend/dist/pkg/*.wasm 2>/dev/null)" || \
+            test -n "$(find crates/frontend/dist -name '*.wasm')"
+          echo "WASM bundle OK"
 
       - name: Upload frontend dist
         uses: actions/upload-artifact@v4

@@ -1,46 +1,64 @@
-# Build stage — compile both frontend (WASM) and backend
+# =====================================================================
+# Pickando Demo — Multi-stage Dockerfile
+# Builds: backend (Linux binary) + frontend (WASM) → minimal runtime image
+# =====================================================================
+
+# ---------- Stage 1: Build everything ----------
 FROM rust:1.96-bookworm AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# System deps for OpenSSL + dioxus-cli
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Cache dependencies
+# ---------- Cache cargo registry separately ----------
+# Copy only manifests so we can cache the dependency build layer
 COPY Cargo.toml Cargo.lock* ./
 COPY crates/shared/Cargo.toml crates/shared/Cargo.toml
 COPY crates/backend/Cargo.toml crates/backend/Cargo.toml
 COPY crates/frontend/Cargo.toml crates/frontend/Cargo.toml
+COPY crates/frontend/Dioxus.toml crates/frontend/Dioxus.toml
 
 # Create dummy sources for dependency caching
 RUN mkdir -p crates/shared/src && echo "pub fn dummy() {}" > crates/shared/src/lib.rs && \
     mkdir -p crates/backend/src && echo "fn main() {}" > crates/backend/src/main.rs && \
-    mkdir -p crates/frontend/src && echo "fn main() {}" > crates/frontend/src/main.rs
+    mkdir -p crates/frontend/src && echo "fn main() {}" > crates/frontend/src/main.rs && \
+    mkdir -p crates/frontend/assets
 
 # Build dependencies only (cached layer)
 RUN cargo build --release -p pickando-shared 2>/dev/null || true
 
-# Copy real source code
+# ---------- Copy real source ----------
 COPY crates/shared/src/ crates/shared/src/
 COPY crates/backend/src/ crates/backend/src/
-COPY crates/frontend/ crates/frontend/
+COPY crates/frontend/src/ crates/frontend/src/
+COPY crates/frontend/assets/ crates/frontend/assets/
 
-# Touch source files to invalidate cache
+# Touch source files to invalidate cache for our crates only
 RUN find crates -name "*.rs" -exec touch {} +
 
-# Build backend binary
+# ---------- Build backend ----------
 RUN cargo build --release -p pickando-backend
 
-# Build frontend WASM
+# ---------- Build frontend WASM ----------
 RUN rustup target add wasm32-unknown-unknown
-RUN cargo install dioxus-cli --version 0.7.9
-RUN cd crates/frontend && dx build --platform web --release || \
-    echo "WASM build failed, serving API-only mode"
 
-# Runtime stage — minimal image
+# Install dioxus-cli with --locked to avoid registry drift.
+# We do NOT swallow errors here — if dx fails, the build fails loudly.
+RUN cargo install dioxus-cli --version 0.7.9 --locked
+
+# Build the WASM bundle. If this fails, the Docker build fails.
+RUN cd crates/frontend && dx build --platform web --release
+
+# Verify the expected output files exist — fail loudly if missing
+RUN test -f /app/crates/frontend/dist/index.html && \
+    echo "[OK] index.html present" && \
+    ls -la /app/crates/frontend/dist/
+
+# ---------- Stage 2: Runtime ----------
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
@@ -53,10 +71,13 @@ WORKDIR /app
 # Copy backend binary
 COPY --from=builder /app/target/release/pickando-backend /app/pickando-backend
 
-# Copy frontend static files (if built)
+# Copy frontend static files (index.html + assets + WASM bundle)
 COPY --from=builder /app/crates/frontend/dist /app/static
 
-# Set environment
+# Make sure index.html exists at /app/static/index.html for the fallback service
+RUN test -f /app/static/index.html || \
+    (echo "ERROR: static/index.html missing" && exit 1)
+
 ENV PORT=3000
 ENV RUST_LOG=pickando=info
 

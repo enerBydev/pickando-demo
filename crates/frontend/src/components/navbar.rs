@@ -2,8 +2,14 @@ use dioxus::prelude::*;
 
 use crate::Page;
 
+/// Platform navbar — only shown inside the platform shell.
+/// The landing page has its own marketing-style header.
 #[component]
-pub fn Navbar(active_page: Page, on_navigate: EventHandler<Page>) -> Element {
+pub fn Navbar(
+    active_page: Page,
+    on_navigate: EventHandler<Page>,
+    on_home: EventHandler<()>,
+) -> Element {
     let mut mobile_open = use_signal(|| false);
 
     let nav_items = [
@@ -18,7 +24,7 @@ pub fn Navbar(active_page: Page, on_navigate: EventHandler<Page>) -> Element {
             div { class: "navbar-inner",
                 div {
                     class: "navbar-brand",
-                    onclick: move |_| on_navigate.call(Page::Home),
+                    onclick: move |_| on_home.call(()),
                     span { class: "brand-icon", "P" }
                     span { class: "brand-text", "Pickando" }
                 }

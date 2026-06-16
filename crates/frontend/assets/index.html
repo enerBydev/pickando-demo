@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Pickando — Same-direction local mobility. Rust + Dioxus + Axum." />
+    <title>Pickando — Same-Direction Local Mobility</title>
+    <link rel="stylesheet" href="/assets/main.css" />
+    <style>
+        /* ===== LOADING SCREEN — replaced by WASM app once mounted ===== */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #0D0D11;
+            color: #E5E7EB;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+        }
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            z-index: 9999;
+            background: radial-gradient(circle at 30% 30%, rgba(0,255,136,0.08), transparent 50%),
+                        radial-gradient(circle at 70% 70%, rgba(37,99,235,0.08), transparent 50%),
+                        #0D0D11;
+        }
+        .loading-logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .loading-logo-mark {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #00FF88 0%, #00C46A 100%);
+            color: #0D0D11;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 1.8rem;
+            box-shadow: 0 0 40px rgba(0,255,136,0.35);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(0,255,136,0.3); transform: scale(1); }
+            50% { box-shadow: 0 0 50px rgba(0,255,136,0.55); transform: scale(1.04); }
+        }
+        .loading-logo-text {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #FFFFFF;
+        }
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(0,255,136,0.18);
+            border-top-color: #00FF88;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-status {
+            font-size: 0.95rem;
+            color: #9CA3AF;
+            letter-spacing: 0.3px;
+        }
+        #loading-error {
+            display: none;
+            max-width: 540px;
+            margin: 0 24px;
+            padding: 20px 24px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            border-radius: 12px;
+            color: #FCA5A5;
+            font-size: 0.9rem;
+            line-height: 1.55;
+            text-align: left;
+        }
+        #loading-error h3 {
+            margin: 0 0 8px;
+            color: #FECACA;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        #loading-error code {
+            display: block;
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.35);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: #FCD34D;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .loading-retry {
+            margin-top: 14px;
+            padding: 8px 18px;
+            background: #00FF88;
+            color: #0D0D11;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .loading-retry:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(0,255,136,0.35);
+        }
+        .loading-version {
+            position: absolute;
+            bottom: 18px;
+            font-size: 0.75rem;
+            color: #4B5563;
+            letter-spacing: 0.4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading screen — Dioxus will replace #main once WASM mounts -->
+    <div id="loading-screen">
+        <div class="loading-logo">
+            <div class="loading-logo-mark">P</div>
+            <div class="loading-logo-text">Pickando</div>
+        </div>
+        <div class="loading-spinner"></div>
+        <div class="loading-status" id="loading-status">Cargando Pickando...</div>
+        <div id="loading-error" role="alert" aria-live="polite">
+            <h3>No se pudo cargar la aplicación</h3>
+            <div id="loading-error-msg"></div>
+            <button class="loading-retry" onclick="location.reload()">Reintentar</button>
+        </div>
+        <div class="loading-version">v0.1.0 — Rust + Dioxus + Axum</div>
+    </div>
+
+    <!-- Dioxus mounts here -->
+    <div id="main"></div>
+
+    <script type="module">
+        // ===== WASM loader with proper diagnostics =====
+        // Dioxus 0.7 generates pickando_frontend.js as the JS glue.
+        // We load it dynamically so we can detect failures and show a clear error
+        // instead of leaving the user stuck on "Cargando Pickando..." forever.
+
+        const status = document.getElementById('loading-status');
+        const errorBox = document.getElementById('loading-error');
+        const errorMsg = document.getElementById('loading-error-msg');
+
+        function showFatalError(reason, detail) {
+            status.style.display = 'none';
+            errorBox.style.display = 'block';
+            errorMsg.innerHTML = reason +
+                '<code>' + detail + '</code>' +
+                '<p style="margin-top:10px;color:#9CA3AF;font-size:0.85rem;">' +
+                'Posibles causas:<br>' +
+                '• El archivo WASM no se generó o no se sirvió correctamente.<br>' +
+                '• Hay un error de red o el backend no está respondiendo.<br>' +
+                '• El navegador no soporta WebAssembly.<br>' +
+                'Revisa la consola del navegador (F12) para más detalles.</p>';
+            console.error('[Pickando] Fatal load error:', reason, detail);
+        }
+
+        function hideLoadingScreen() {
+            const ls = document.getElementById('loading-screen');
+            if (ls && ls.parentNode) {
+                ls.style.transition = 'opacity 0.35s ease';
+                ls.style.opacity = '0';
+                setTimeout(() => ls.parentNode.removeChild(ls), 400);
+            }
+        }
+
+        // Detect WASM support early
+        if (typeof WebAssembly === 'undefined') {
+            showFatalError(
+                'Este navegador no soporta WebAssembly.',
+                'WebAssembly object is undefined.'
+            );
+        } else {
+            // Try to load the Dioxus JS glue.
+            // Dioxus 0.7 emits the JS at ./pickando_frontend.js (or /pkg/pickando_frontend.js depending on bundler)
+            // We try multiple paths to be robust.
+            const candidates = [
+                './pickando_frontend.js',
+                './pkg/pickando_frontend.js',
+                '/pickando_frontend.js',
+            ];
+
+            let tried = 0;
+            function tryNext() {
+                if (tried >= candidates.length) {
+                    showFatalError(
+                        'No se encontró el archivo JavaScript de la aplicación.',
+                        'Tried paths:\n  ' + candidates.join('\n  ') +
+                        '\n\nLikely the WASM build step failed in the Docker image. ' +
+                        'Verify that dx build --platform web succeeded.'
+                    );
+                    return;
+                }
+                const path = candidates[tried++];
+                status.textContent = 'Cargando Pickando... (' + path + ')';
+
+                import(path)
+                    .then(mod => {
+                        status.textContent = 'Inicializando aplicación...';
+                        // Dioxus auto-initializes on import. We just wait for #main to populate.
+                        // Give the WASM 8 seconds to mount something into #main.
+                        const deadline = Date.now() + 8000;
+                        function checkMount() {
+                            const main = document.getElementById('main');
+                            if (main && main.children.length > 0) {
+                                hideLoadingScreen();
+                            } else if (Date.now() < deadline) {
+                                setTimeout(checkMount, 100);
+                            } else {
+                                showFatalError(
+                                    'La aplicación cargó pero no se montó en el DOM.',
+                                    'JS module loaded: ' + path + '\n' +
+                                    '#main is empty after 8 seconds.\n' +
+                                    'Check the browser console for runtime errors.'
+                                );
+                            }
+                        }
+                        checkMount();
+                    })
+                    .catch(err => {
+                        console.warn('[Pickando] Failed to load', path, err);
+                        tryNext();
+                    });
+            }
+            tryNext();
+        }
+
+        // Safety net: if after 25s we're still showing the loading screen, surface an error
+        setTimeout(() => {
+            if (document.getElementById('loading-screen') &&
+                errorBox.style.display !== 'block') {
+                showFatalError(
+                    'La aplicación tardó demasiado en iniciar.',
+                    'Timeout after 25 seconds.\n' +
+                    'The WASM file may be too large or the connection too slow.'
+                );
+            }
+        }, 25000);
+    </script>
+</body>
+</html>

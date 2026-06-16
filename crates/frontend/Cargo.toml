@@ -10,6 +10,19 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { version = "0.12", features = ["json"] }
 
+# WebSocket + browser APIs for the live WS demo
+web-sys = { version = "0.3", features = [
+    "WebSocket",
+    "MessageEvent",
+    "Event",
+    "CloseEvent",
+    "Location",
+    "Window",
+    "ErrorEvent",
+] }
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+
 [features]
 default = ["web"]
 web = ["dioxus/web"]
