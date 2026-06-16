@@ -203,7 +203,10 @@ async fn test_join_route_success() {
     let routes: Vec<Route> = serde_json::from_slice(&body).unwrap();
 
     let route_001 = routes.iter().find(|r| r.id == "route-001").unwrap();
-    assert_eq!(route_001.seats_available, 2, "Seats should have been decremented from 3 to 2");
+    assert_eq!(
+        route_001.seats_available, 2,
+        "Seats should have been decremented from 3 to 2"
+    );
 }
 
 #[tokio::test]
