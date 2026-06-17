@@ -28,6 +28,26 @@ pub async fn post_json<T: DeserializeOwned, B: Serialize>(
     let body_str = serde_json::to_string(body).map_err(|e| format!("serialize body: {e}"))?;
     let resp = fetch(url, "POST", Some(body_str)).await?;
     let text = read_response_text(resp).await?;
+    serde_json::from_str(&text).map_err(|e| format!("parse JSON: {e} (body was: {text})"))
+}
+
+/// Send a DELETE request and return the body as text.
+pub async fn delete_text(url: &str) -> Result<String, String> {
+    let resp = fetch(url, "DELETE", None).await?;
+    read_response_text(resp).await
+}
+
+/// Send a POST with no body (used by ride-request when body is built inline).
+#[allow(dead_code)]
+pub async fn post_empty(url: &str) -> Result<String, String> {
+    let resp = fetch(url, "POST", Some("{}".to_string())).await?;
+    read_response_text(resp).await
+}
+
+/// Send a DELETE request and return JSON-deserialized T.
+#[allow(dead_code)]
+pub async fn delete_json<T: DeserializeOwned>(url: &str) -> Result<T, String> {
+    let text = delete_text(url).await?;
     serde_json::from_str(&text).map_err(|e| format!("parse JSON: {e}"))
 }
 
@@ -74,7 +94,9 @@ async fn fetch(url: &str, method: &str, body: Option<String>) -> Result<web_sys:
         .map_err(|_| "response not a Response".to_string())?;
 
     if !resp.ok() {
-        return Err(format!("HTTP {}", resp.status()));
+        let status = resp.status();
+        let body_text = read_response_text(resp).await.unwrap_or_default();
+        return Err(format!("HTTP {status}: {body_text}"));
     }
 
     Ok(resp)

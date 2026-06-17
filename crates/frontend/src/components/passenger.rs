@@ -5,20 +5,28 @@ use wasm_bindgen::JsCast;
 use crate::api;
 
 /// Passenger search page — the core matching feature demo.
+///
+/// Features:
 /// - Auto-loads all routes on mount
 /// - Calls POST /api/v1/match with passenger coordinates
-/// - Includes a live WebSocket visual demo
+/// - Optional bearing + time window for advanced matching
+/// - Live WebSocket demo with typed message rendering
+/// - Platform stats dashboard pulling from /api/v1/stats
 #[component]
 pub fn PassengerPage() -> Element {
     let mut lat = use_signal(|| String::from("19.4326"));
     let mut lng = use_signal(|| String::from("-99.1332"));
     let mut radius = use_signal(|| String::from("5"));
+    let mut bearing = use_signal(String::new);
+    let mut time_window = use_signal(String::new);
+    let mut passenger_time = use_signal(String::new);
     let mut matches = use_signal(Vec::<MatchResult>::new);
     let mut all_routes = use_signal(Vec::<Route>::new);
     let mut loading = use_signal(|| false);
     let mut active_tab = use_signal(|| 0u8);
     let mut status_msg = use_signal(String::new);
     let mut error_msg = use_signal(String::new);
+    let mut last_query_ms = use_signal(|| 0u128);
 
     // Auto-load all routes on mount so the page feels alive
     use_effect(move || {
@@ -27,7 +35,7 @@ pub fn PassengerPage() -> Element {
                 Ok(data) => {
                     let count = data.len();
                     all_routes.set(data);
-                    status_msg.set(format!("{} rutas cargadas desde el backend", count));
+                    status_msg.set(format!("{count} rutas cargadas desde el backend"));
                 }
                 Err(e) => error_msg.set(format!("No se pudieron cargar rutas: {e}")),
             }
@@ -48,22 +56,22 @@ pub fn PassengerPage() -> Element {
                 button {
                     class: if active_tab() == 0 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(0),
-                    "🔍 Buscar Matches"
+                    "🔍 Matching"
                 }
                 button {
                     class: if active_tab() == 1 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(1),
-                    "📋 Rutas Disponibles ({all_routes().len()})"
+                    "📋 Rutas ({all_routes().len()})"
                 }
                 button {
                     class: if active_tab() == 2 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(2),
-                    "🔴 WebSocket en vivo"
+                    "🔴 WebSocket"
                 }
                 button {
                     class: if active_tab() == 3 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(3),
-                    "📊 Status del Sistema"
+                    "📊 Stats"
                 }
             }
 
@@ -88,7 +96,7 @@ pub fn PassengerPage() -> Element {
                 div { class: "card",
                     h2 { "Búsqueda por Ubicación" }
                     p { class: "form-note",
-                        "POST /api/v1/match — Motor de matching con Geohash + Haversine en Rust puro"
+                        "POST /api/v1/match — Geohash + Haversine + dirección + ventana temporal"
                     }
 
                     div { class: "form-row",
@@ -116,6 +124,41 @@ pub fn PassengerPage() -> Element {
                             r#type: "text",
                             value: "{radius}",
                             oninput: move |e| radius.set(e.value()),
+                        }
+                    }
+
+                    // Advanced filters (collapsible visually via CSS class)
+                    details { class: "advanced-filters",
+                        summary { "Filtros avanzados (dirección + tiempo)" }
+                        div { class: "advanced-filters-inner",
+                            div { class: "form-row",
+                                div { class: "form-group",
+                                    label { "Dirección (grados, 0=N, 90=E)" }
+                                    input {
+                                        r#type: "text",
+                                        value: "{bearing}",
+                                        oninput: move |e| bearing.set(e.value()),
+                                        placeholder: "Ej: 45 (noreste)"
+                                    }
+                                }
+                                div { class: "form-group",
+                                    label { "Ventana tiempo (min)" }
+                                    input {
+                                        r#type: "text",
+                                        value: "{time_window}",
+                                        oninput: move |e| time_window.set(e.value()),
+                                        placeholder: "Ej: 60"
+                                    }
+                                }
+                            }
+                            div { class: "form-group",
+                                label { "Tu hora de salida (HH:MM)" }
+                                input {
+                                    r#type: "time",
+                                    value: "{passenger_time}",
+                                    oninput: move |e| passenger_time.set(e.value()),
+                                }
+                            }
                         }
                     }
 
@@ -158,29 +201,54 @@ pub fn PassengerPage() -> Element {
                             let lat_val = lat().parse::<f64>().unwrap_or(19.4326);
                             let lng_val = lng().parse::<f64>().unwrap_or(-99.1332);
                             let radius_val = radius().parse::<f64>().unwrap_or(5.0);
+                            let bearing_val = bearing().trim().parse::<f64>().ok();
+                            let time_window_val = time_window().trim().parse::<i64>().ok();
+                            let passenger_time_val = if passenger_time().trim().is_empty() {
+                                None
+                            } else {
+                                Some(passenger_time())
+                            };
 
                             let body = MatchRequest {
                                 lat: lat_val,
                                 lng: lng_val,
                                 radius_km: Some(radius_val),
+                                passenger_bearing_deg: bearing_val,
+                                time_window_minutes: time_window_val,
+                                passenger_departure_time: passenger_time_val,
                             };
+
+                            let started = web_sys::window()
+                                .and_then(|w| w.performance())
+                                .map(|p| p.now() as u128);
 
                             match api::post_json::<Vec<MatchResult>, _>("/api/v1/match", &body)
                                 .await
                             {
                                 Ok(data) => {
                                     let count = data.len();
+                                    let elapsed = started.map(|s| web_sys::window()
+                                        .and_then(|w| w.performance())
+                                        .map(|p| p.now() as u128 - s)
+                                        .unwrap_or(0))
+                                        .unwrap_or(0);
                                     matches.set(data);
+                                    last_query_ms.set(elapsed);
                                     status_msg.set(format!(
-                                        "Encontradas {} rutas compatibles en {}km de radio",
-                                        count, radius_val
+                                        "{count} matches en {elapsed}ms · radio {radius_val}km"
                                     ));
                                 }
                                 Err(e) => error_msg.set(format!("Error en búsqueda: {e}")),
                             }
                             loading.set(false);
                         },
-                        if loading() { "Buscando..." } else { "Buscar Matches" }
+                        if loading() { "Buscando..." } else { "🔍 Buscar Matches" }
+                    }
+
+                    if last_query_ms() > 0 {
+                        div { class: "match-meta",
+                            span { "⏱ Latencia: {last_query_ms()}ms" }
+                        }
                     }
 
                     if !matches().is_empty() {
@@ -192,7 +260,7 @@ pub fn PassengerPage() -> Element {
                                     div { class: "match-header",
                                         span { class: "route-id", "{m.route.id}" }
                                         span { class: "match-distance",
-                                            "{m.distance_km} km"
+                                            "📍 {m.distance_km} km"
                                         }
                                     }
                                     div { class: "match-body",
@@ -205,21 +273,63 @@ pub fn PassengerPage() -> Element {
                                             span { "{m.route.dest_address}" }
                                         }
                                         div { class: "route-meta",
-                                            span { "Salida: {m.route.departure_time}" }
-                                            span { "Asientos: {m.route.seats_available}" }
+                                            span { "🕐 {m.route.departure_time}" }
+                                            span { "💺 {m.route.seats_available}" }
+                                        }
+                                    }
+                                    div { class: "match-scores",
+                                        div { class: "score-bar",
+                                            span { class: "score-label", "Relevancia" }
+                                            div { class: "score-track",
+                                                div {
+                                                    class: "score-fill",
+                                                    style: "width: {(m.relevance_score * 100.0):.0}%",
+                                                }
+                                            }
+                                            span { class: "score-value", "{m.relevance_score:.2}" }
+                                        }
+                                        div { class: "score-bar",
+                                            span { class: "score-label", "Dirección" }
+                                            div { class: "score-track",
+                                                div {
+                                                    class: "score-fill score-dir",
+                                                    style: "width: {((m.direction_similarity + 1.0) * 50.0):.0}%",
+                                                }
+                                            }
+                                            span { class: "score-value", "{m.direction_similarity:.2}" }
+                                        }
+                                        div { class: "score-bar",
+                                            span { class: "score-label", "Tiempo" }
+                                            div { class: "score-track",
+                                                div {
+                                                    class: "score-fill score-time",
+                                                    style: "width: {(m.time_compatibility * 100.0):.0}%",
+                                                }
+                                            }
+                                            span { class: "score-value", "{m.time_compatibility:.2}" }
                                         }
                                     }
                                     div { class: "match-footer",
-                                        span { class: "score",
-                                            "Relevancia: {m.relevance_score} · Dirección: {m.direction_similarity}"
-                                        }
                                         button {
                                             class: "btn-sm btn-primary",
                                             onclick: move |_| {
-                                                status_msg.set(format!(
-                                                    "Solicitud enviada al conductor de la ruta {} — simulado (la API real expone esto en una versión futura)",
-                                                    m.route.id
-                                                ));
+                                                let route_id = m.route.id.clone();
+                                                async move {
+                                                    let url = format!("/api/v1/routes/{route_id}/request");
+                                                    let body = serde_json::json!({
+                                                        "passenger_name": "Pasajero Demo",
+                                                        "seats_requested": 1,
+                                                    });
+                                                    match api::post_json::<pickando_shared::models::RideRequest, _>(&url, &body).await {
+                                                        Ok(req) => {
+                                                            status_msg.set(format!(
+                                                                "Solicitud {} enviada — el conductor verá tu petición",
+                                                                req.id
+                                                            ));
+                                                        }
+                                                        Err(e) => error_msg.set(format!("Error: {e}")),
+                                                    }
+                                                }
                                             },
                                             "Solicitar unirme"
                                         }
@@ -241,7 +351,7 @@ pub fn PassengerPage() -> Element {
                 div { class: "card",
                     h2 { "Rutas Publicadas ({all_routes().len()})" }
                     p { class: "form-note",
-                        "GET /api/v1/routes — Datos en vivo desde el backend (cargados automáticamente al entrar a esta página)"
+                        "GET /api/v1/routes — Datos en vivo desde el backend"
                     }
 
                     button {
@@ -253,7 +363,7 @@ pub fn PassengerPage() -> Element {
                                 Ok(data) => {
                                     let count = data.len();
                                     all_routes.set(data);
-                                    status_msg.set(format!("{} rutas cargadas", count));
+                                    status_msg.set(format!("{count} rutas cargadas"));
                                 }
                                 Err(e) => error_msg.set(format!("Error: {e}")),
                             }
@@ -300,51 +410,9 @@ pub fn PassengerPage() -> Element {
                 {rsx! { WebSocketDemo {} }}
             }
 
-            // ===== Tab 3: System Status =====
+            // ===== Tab 3: Stats =====
             if active_tab() == 3 {
-                div { class: "card",
-                    h2 { "Status del Sistema" }
-                    p { class: "form-note",
-                        "GET /api/v1/health — Health check del backend Rust/Axum"
-                    }
-
-                    {rsx! { HealthChecker {} }}
-
-                    div { class: "tech-grid",
-                        div { class: "tech-item",
-                            span { class: "tech-name", "Frontend" }
-                            span { class: "tech-value", "Dioxus 0.7 → WASM" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "Backend" }
-                            span { class: "tech-value", "Axum 0.8 + Tokio" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "Datos" }
-                            span { class: "tech-value", "In-memory (RwLock)" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "Matching" }
-                            span { class: "tech-value", "Geohash + Haversine" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "WebSocket" }
-                            span { class: "tech-value", "Bidireccional en vivo" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "Deploy" }
-                            span { class: "tech-value", "Railway" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "Lenguaje" }
-                            span { class: "tech-value", "Rust 1.96" }
-                        }
-                        div { class: "tech-item",
-                            span { class: "tech-name", "CI/CD" }
-                            span { class: "tech-value", "GitHub Actions" }
-                        }
-                    }
-                }
+                {rsx! { StatsPanel {} }}
             }
         }
     }
@@ -357,6 +425,7 @@ fn WebSocketDemo() -> Element {
     let mut connected = use_signal(|| false);
     let mut messages = use_signal(Vec::<String>::new);
     let mut input_text = use_signal(String::new);
+    let msg_count = use_signal(|| 0u32);
     // The WebSocket handle must live across renders — use a Signal<Option<...>>.
     let mut ws_handle: Signal<Option<std::rc::Rc<web_sys::WebSocket>>> = use_signal(|| None);
 
@@ -379,11 +448,13 @@ fn WebSocketDemo() -> Element {
 
             let mut messages_handle = messages.to_owned();
             let mut connected_handle = connected.to_owned();
+            let mut count_handle = msg_count.to_owned();
             let ws_handle_clone = ws_handle.to_owned();
 
             let onopen =
                 wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::new(move |_e| {
                     connected_handle.set(true);
+                    *count_handle.write() = 0;
                     messages_handle
                         .write()
                         .push("✅ Conectado al servidor WebSocket".into());
@@ -392,10 +463,27 @@ fn WebSocketDemo() -> Element {
             onopen.forget();
 
             let mut messages_handle2 = messages.to_owned();
+            let mut count_handle2 = msg_count.to_owned();
             let onmessage = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::MessageEvent)>::new(
                 move |e: web_sys::MessageEvent| {
                     if let Some(text) = e.data().as_string() {
-                        messages_handle2.write().push(format!("📥 {text}"));
+                        // Pretty-print JSON if possible
+                        let pretty = serde_json::from_str::<serde_json::Value>(&text)
+                            .ok()
+                            .and_then(|v| serde_json::to_string_pretty(&v).ok())
+                            .unwrap_or_else(|| text.clone());
+                        let label = match serde_json::from_str::<serde_json::Value>(&text) {
+                            Ok(v) => v
+                                .get("type")
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("unknown")
+                                .to_string(),
+                            Err(_) => "raw".to_string(),
+                        };
+                        *count_handle2.write() += 1;
+                        messages_handle2
+                            .write()
+                            .push(format!("📥 [{label}] {pretty}"));
                     }
                 },
             );
@@ -457,7 +545,7 @@ fn WebSocketDemo() -> Element {
         div { class: "card ws-demo",
             h2 { "WebSocket en vivo" }
             p { class: "form-note",
-                "GET /ws — Conexión bidireccional. El servidor envía un tick cada 5s y hace echo de todo lo que envíes."
+                "GET /ws — Conexión bidireccional. El servidor envía ticks cada 5s + eventos broadcast (route_created, route_cancelled, ride_request)."
             }
 
             div { class: "ws-controls",
@@ -476,7 +564,7 @@ fn WebSocketDemo() -> Element {
                 }
                 span {
                     class: if connected() { "ws-status connected" } else { "ws-status disconnected" },
-                    if connected() { "● En vivo" } else { "○ Desconectado" }
+                    if connected() { "● En vivo · {msg_count} msgs" } else { "○ Desconectado" }
                 }
             }
 
@@ -514,28 +602,56 @@ fn WebSocketDemo() -> Element {
     }
 }
 
+/// Stats dashboard — pulls from /api/v1/stats.
 #[component]
-fn HealthChecker() -> Element {
-    let mut health = use_signal(|| String::from("Haz clic para verificar"));
-    let mut checking = use_signal(|| false);
+fn StatsPanel() -> Element {
+    let mut stats_json = use_signal(|| String::from("Haz clic para cargar métricas"));
+    let mut loading = use_signal(|| false);
+    let mut error = use_signal(String::new);
 
     rsx! {
-        button {
-            class: "btn-primary",
-            disabled: checking(),
-            onclick: move |_| async move {
-                checking.set(true);
-                match api::fetch_text("/api/v1/health").await {
-                    Ok(data) => health.set(data),
-                    Err(e) => health.set(format!("No se pudo conectar al backend: {e}")),
-                }
-                checking.set(false);
-            },
-            if checking() { "Verificando..." } else { "Verificar Status" }
-        }
+        div { class: "card",
+            h2 { "Métricas del Sistema" }
+            p { class: "form-note",
+                "GET /api/v1/stats — Telemetría en vivo desde el backend"
+            }
 
-        div { class: "status-box",
-            pre { "{health()}" }
+            button {
+                class: "btn-primary",
+                disabled: loading(),
+                onclick: move |_| async move {
+                    loading.set(true);
+                    error.set(String::new());
+                    match api::fetch_text("/api/v1/stats").await {
+                        Ok(data) => {
+                            // Pretty-print
+                            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&data) {
+                                if let Ok(pretty) = serde_json::to_string_pretty(&v) {
+                                    stats_json.set(pretty);
+                                } else {
+                                    stats_json.set(data);
+                                }
+                            } else {
+                                stats_json.set(data);
+                            }
+                        }
+                        Err(e) => error.set(format!("No se pudieron cargar métricas: {e}")),
+                    }
+                    loading.set(false);
+                },
+                if loading() { "Cargando..." } else { "📊 Cargar métricas" }
+            }
+
+            {if !error().is_empty() {
+                rsx! { div { class: "alert alert-error",
+                    span { class: "alert-icon", "!" }
+                    "{error()}"
+                }}
+            } else { rsx! {} }}
+
+            div { class: "status-box",
+                pre { "{stats_json()}" }
+            }
         }
     }
 }

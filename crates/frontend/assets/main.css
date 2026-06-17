@@ -1543,3 +1543,155 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ============ v0.2.0 additions — score bars, advanced filters, quality list ============ */
+
+/* Score bars in match results — visual representation of relevance/direction/time */
+.match-scores {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.score-bar {
+    display: grid;
+    grid-template-columns: 90px 1fr 40px;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+}
+
+.score-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.score-track {
+    height: 6px;
+    background: var(--surface-2);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.score-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00FF88 0%, #00C46A 100%);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+.score-fill.score-dir {
+    background: linear-gradient(90deg, #2563EB 0%, #7C3AED 100%);
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
+}
+
+.score-fill.score-time {
+    background: linear-gradient(90deg, #F59E0B 0%, #D97706 100%);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
+.score-value {
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    text-align: right;
+    font-weight: 600;
+}
+
+/* Advanced filters (collapsible <details>) */
+.advanced-filters {
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-1);
+    overflow: hidden;
+}
+
+.advanced-filters summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    user-select: none;
+    transition: color 0.15s, background 0.15s;
+}
+
+.advanced-filters summary:hover {
+    color: var(--primary);
+    background: var(--surface-2);
+}
+
+.advanced-filters[open] summary {
+    border-bottom: 1px solid var(--border);
+    color: var(--primary);
+}
+
+.advanced-filters-inner {
+    padding: 16px;
+}
+
+/* Match meta (latency, etc.) */
+.match-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--surface-1);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Quality list in About page */
+.quality-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 8px;
+}
+
+.quality-list li {
+    padding: 10px 14px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: var(--text);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.quality-list li:hover {
+    border-color: var(--primary);
+    background: var(--surface-2);
+}
+
+/* Code element in tables */
+.reuse-table code,
+.demo-list code {
+    background: var(--surface-2);
+    color: var(--primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+}
+
+/* Responsive tweaks for score bars */
+@media (max-width: 640px) {
+    .score-bar {
+        grid-template-columns: 70px 1fr 36px;
+        font-size: 0.8rem;
+    }
+    .quality-list {
+        grid-template-columns: 1fr;
+    }
+}
