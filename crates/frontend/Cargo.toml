@@ -2,6 +2,11 @@
 name = "pickando-frontend"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Dioxus 0.7 frontend for Pickando — same-direction local mobility demo"
+categories.workspace = true
+keywords.workspace = true
 
 [dependencies]
 pickando-shared = { path = "../shared" }

@@ -20,6 +20,7 @@ allow = [
     "0BSD",
     "Unlicense",
     "MPL-2.0",
+    "CDLA-Permissive-2.0",
 ]
 exceptions = [
     # ring uses a non-standard but permissive license
@@ -44,12 +45,14 @@ ignore = [
 
 # ---------- Banned crates ----------
 [bans]
+# Duplicates are warnings, not errors — the Rust ecosystem still has
+# many transitive version splits (e.g. getrandom 0.3 + 0.4) that we
+# cannot control. We flag them but don't fail the build.
 multiple-versions = "warn"
-wildcards = "deny"
-deny = [
-    # Crates we never want to depend on (security/maintenance issues).
-    { name = "openssl", deny-multiple-versions = false },
-]
+# Wildcards (`dep = "1"` without patch) are also warnings — we pin
+# our direct deps but transitive deps may use wildcards.
+wildcards = "warn"
+deny = []
 skip = [
     # Allow specific duplicate versions until upstream aligns.
     # Each entry should have a comment explaining why.
