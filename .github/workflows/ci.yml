@@ -59,9 +59,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2.0.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          toolchain: 1.96.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-v1
+      - name: Install cargo-audit (cached)
+        run: |
+          if ! command -v cargo-audit >/dev/null 2>&1; then
+            cargo install cargo-audit --locked --no-default-features
+          fi
+      - name: Run cargo audit (deny vulnerabilities, allow unmaintained warnings)
+        # --deny vulnerabilities fails the build on real security issues.
+        # unmaintained/unsound/notice are warnings only — they flag
+        # transitive deps we cannot control (gtk-rs via Dioxus, etc.).
+        run: cargo audit --deny vulnerabilities
 
   # =====================================================================
   # Job 4: cargo-deny (licenses + bans + sources)
