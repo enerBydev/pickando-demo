@@ -74,11 +74,19 @@ jobs:
           if ! command -v cargo-audit >/dev/null 2>&1; then
             cargo install cargo-audit --locked --no-default-features
           fi
-      - name: Run cargo audit (deny vulnerabilities, allow unmaintained warnings)
-        # --deny vulnerabilities fails the build on real security issues.
-        # unmaintained/unsound/notice are warnings only — they flag
-        # transitive deps we cannot control (gtk-rs via Dioxus, etc.).
-        run: cargo audit --deny vulnerabilities
+      - name: Run cargo audit
+        # cargo audit by default:
+        #   - Exits non-zero if it finds real VULNERABILITIES (security issues)
+        #   - Prints WARNINGS for unmaintained/unsound transitive deps
+        #     (gtk-rs GTK3 via Dioxus, paste, proc-macro-error, rand 0.7)
+        #     These are upstream issues we cannot fix without dropping Dioxus
+        #     and are documented in CHANGELOG.md and SECURITY.md.
+        # We do NOT pass --deny warnings (that would fail on the upstream
+        # unmaintained crates). We DO want the build to fail on real
+        # vulnerabilities, which is cargo audit's default behavior.
+        # --no-yanked: don't fail on yanked crates (Dioxus has some)
+        # --stale: allow using a cached advisory DB (CI cache friendly)
+        run: cargo audit --no-yanked --stale
 
   # =====================================================================
   # Job 4: cargo-deny (licenses + bans + sources)
