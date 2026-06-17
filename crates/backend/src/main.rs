@@ -10,6 +10,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
 mod broadcast;
+mod persistence;
 mod routes;
 mod state;
 mod ws;
@@ -29,8 +30,24 @@ async fn main() {
         .init();
 
     let start_time = Instant::now();
-    let sample_routes = init_sample_routes();
-    let state = Arc::new(AppState::new(sample_routes, start_time));
+
+    // Try to load persisted state from disk. If it exists, use it.
+    // Otherwise, fall back to the seed routes.
+    let (initial_routes, initial_ride_requests) = match persistence::load_state().await {
+        Some(persisted) => (persisted.routes, persisted.ride_requests),
+        None => (init_sample_routes(), Vec::new()),
+    };
+
+    let state = Arc::new(AppState::new(initial_routes, start_time));
+
+    // Pre-populate ride_requests if loaded from persistence
+    if !initial_ride_requests.is_empty() {
+        let mut rr = state.ride_requests.write().await;
+        *rr = initial_ride_requests;
+    }
+
+    // Spawn the background persistence task (writes state to disk every 30s)
+    persistence::spawn_persistence_task(state.routes.clone(), state.ride_requests.clone());
 
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
