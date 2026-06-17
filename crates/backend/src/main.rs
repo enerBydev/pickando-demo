@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -49,9 +49,17 @@ async fn main() {
         .route("/ws", get(ws::ws_handler))
         .with_state(state.clone());
 
+    // Static file server with SPA fallback.
+    // ServeDir::not_found_service makes any non-asset path return index.html,
+    // so the frontend router can handle deep links like /passenger or /driver.
+    let spa_fallback = ServeFile::new("static/index.html");
+    let static_service = ServeDir::new("static")
+        .append_index_html_on_directories(true)
+        .not_found_service(spa_fallback);
+
     let app = Router::new()
         .merge(api_routes)
-        .fallback_service(ServeDir::new("static").append_index_html_on_directories(true))
+        .fallback_service(static_service)
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
             let req_id = uuid::Uuid::new_v4().simple();

@@ -24,7 +24,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 button {
                     class: "btn-primary btn-lg landing-cta",
                     onclick: move |_| on_enter_platform.call(Page::Passenger),
-                    "Entrar a la plataforma"
+                    "Entrar a la plataforma →"
                 }
             }
         }
@@ -32,6 +32,50 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         // ===== Hero =====
         section { class: "landing-hero",
             div { class: "hero-glow" }
+
+            // Animated SVG showing routes converging — the visual
+            // metaphor for "same-direction mobility"
+            div { class: "hero-route-bg",
+                svg {
+                    view_box: "0 0 1200 800",
+                    preserve_aspect_ratio: "xMidYMid slice",
+                    xmlns: "http://www.w3.org/2000/svg",
+                    // Route 1: top-left to center
+                    path {
+                        class: "hero-route-line",
+                        d: "M 100 100 Q 400 200 600 400",
+                        opacity: "0.6",
+                    }
+                    // Route 2: top-right to center
+                    path {
+                        class: "hero-route-line",
+                        d: "M 1100 150 Q 800 300 600 400",
+                        opacity: "0.6",
+                        style: "animation-delay: -10s;",
+                    }
+                    // Route 3: bottom-left to center
+                    path {
+                        class: "hero-route-line",
+                        d: "M 150 700 Q 400 550 600 400",
+                        opacity: "0.6",
+                        style: "animation-delay: -20s;",
+                    }
+                    // Route 4: bottom-right to center
+                    path {
+                        class: "hero-route-line",
+                        d: "M 1050 650 Q 800 500 600 400",
+                        opacity: "0.6",
+                        style: "animation-delay: -30s;",
+                    }
+                    // Convergence points
+                    circle { cx: "600", cy: "400", r: "8", fill: "#00B894", opacity: "0.8" }
+                    circle { cx: "100", cy: "100", r: "5", fill: "#FF8A3D", opacity: "0.6" }
+                    circle { cx: "1100", cy: "150", r: "5", fill: "#FF8A3D", opacity: "0.6" }
+                    circle { cx: "150", cy: "700", r: "5", fill: "#FF8A3D", opacity: "0.6" }
+                    circle { cx: "1050", cy: "650", r: "5", fill: "#FF8A3D", opacity: "0.6" }
+                }
+            }
+
             div { class: "landing-hero-inner",
                 div { class: "hero-badge",
                     span { class: "hero-badge-dot" }
@@ -42,20 +86,20 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     span { class: "highlight", "misma dirección" }
                 }
                 p { class: "hero-subtitle",
-                    "Conecta con conductores que van por tu camino. \
-                    Sin desvíos, sin esperas infinitas. Llega más rápido, \
-                    paga menos, comparte el viaje."
+                    "Conecta con conductores que ya van por tu camino. \
+                    Sin desvíos, sin esperas infinitas. Comparte el viaje, \
+                    comparte el costo, reduce tu huella."
                 }
                 div { class: "hero-actions",
                     button {
                         class: "btn-primary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "Buscar viaje"
+                        "🔍 Buscar viaje"
                     }
                     button {
                         class: "btn-secondary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Driver),
-                        "Publicar ruta"
+                        "🚗 Publicar ruta"
                     }
                 }
                 div { class: "hero-trust",
@@ -64,6 +108,8 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     span { "🔒 100% Rust" }
                     span { class: "hero-trust-dot" }
                     span { "🌐 Web, Desktop, Android" }
+                    span { class: "hero-trust-dot" }
+                    span { "💚 Demo gratis" }
                 }
             }
         }
@@ -87,7 +133,12 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 }
                 div { class: "stat-divider" }
                 div { class: "stat",
-                    span { class: "stat-number", "0" }
+                    span { class: "stat-number", "51" }
+                    span { class: "stat-label", "Tests" }
+                }
+                div { class: "stat-divider" }
+                div { class: "stat",
+                    span { class: "stat-number", "$0" }
                     span { class: "stat-label", "Costo demo" }
                 }
             }
@@ -111,13 +162,13 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                         div { class: "how-step-num", "02" }
                         h3 { "Buscas match" }
                         p { "El pasajero comparte su ubicación. El motor encuentra conductores dentro del radio usando Haversine — todo en Rust puro." }
-                        span { class: "how-tag", "Geohash + Haversine" }
+                        span { class: "how-tag", "Geohash + Haversine + Bearing" }
                     }
                     div { class: "how-step",
                         div { class: "how-step-num", "03" }
                         h3 { "Te conectas en vivo" }
                         p { "WebSocket bidireccional: tracking GPS, estado del viaje, mensajes. Tiempo real sin recargas." }
-                        span { class: "how-tag", "WebSocket /ws" }
+                        span { class: "how-tag", "WebSocket /ws · broadcast" }
                     }
                 }
             }
@@ -134,37 +185,37 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     div { class: "feature-card",
                         div { class: "feature-icon", "🧭" }
                         h3 { "Matching inteligente" }
-                        p { "Geohash + Haversine en Rust puro. Encuentra conductores dentro de tu radio que van en tu misma dirección." }
+                        p { "Geohash + Haversine + similitud de dirección + ventana temporal. Encuentra conductores que van en tu misma dirección, no solo cerca." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
                         div { class: "feature-icon", "⚡" }
                         h3 { "Tiempo real" }
-                        p { "WebSocket bidireccional para tracking GPS en vivo. Conexión persistente, latencia mínima." }
+                        p { "WebSocket bidireccional con broadcast. Cualquier cliente conectado ve route_created, route_cancelled y ride_request al instante." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
                         div { class: "feature-icon", "🖥️" }
                         h3 { "Multi-plataforma" }
-                        p { "Un solo codebase → Web (WASM), Linux, Windows, Android. Rust compila a todo." }
+                        p { "Un solo codebase → Web (WASM), Linux, Windows, Android. Rust compila a todo. Sin Dart, sin JavaScript, sin Electron." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
                         div { class: "feature-icon", "📊" }
-                        h3 { "Visualización en vivo" }
-                        p { "Panel de métricas del backend: uptime, rutas activas, matches recientes. Datos reales desde el servidor." }
+                        h3 { "Telemetría en vivo" }
+                        p { "GET /api/v1/stats: rutas por estado, solicitudes, uptime, requests servidos, uso de memoria. Todo en tiempo real." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
                         div { class: "feature-icon", "🔌" }
-                        h3 { "API REST + WS" }
-                        p { "5 endpoints REST documentados + WebSocket. CORS configurado, JSON tipado, responses tipadas con serde." }
+                        h3 { "API REST completa" }
+                        p { "8 endpoints documentados + WebSocket. CORS, gzip, tracing con UUID por request, error handling tipado." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
                         div { class: "feature-icon", "🎨" }
-                        h3 { "Diseño cuidado" }
-                        p { "Dark theme premium, animaciones, transiciones, responsive. No es un cascarón — es un producto." }
+                        h3 { "Diseño con alma" }
+                        p { "Dark theme premium, paleta cálida (emerald + amber), microinteracciones, animaciones, responsive mobile-first." }
                         span { class: "feature-tag", "Funcional" }
                     }
                 }
@@ -207,7 +258,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     div { class: "arch-block",
                         div { class: "arch-label", "Deploy" }
                         div { class: "arch-value", "Railway + CI/CD" }
-                        div { class: "arch-detail", "GitHub Actions" }
+                        div { class: "arch-detail", "GitHub Actions + APK" }
                     }
                 }
             }
@@ -217,12 +268,12 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         section { class: "landing-cta-section",
             div { class: "landing-cta-inner",
                 h2 { "Prueba la demo en vivo" }
-                p { "Sin registro, sin costo. Entra a la plataforma y prueba el matching, publica rutas, observa el WebSocket en acción." }
+                p { "Sin registro, sin costo. Entra a la plataforma y prueba el matching, publica rutas, observa el WebSocket en acción. Todo corre desde Rust compilado a WebAssembly." }
                 div { class: "landing-cta-actions",
                     button {
                         class: "btn-primary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "Buscar viaje"
+                        "🔍 Buscar viaje"
                     }
                     button {
                         class: "btn-secondary btn-lg",
@@ -233,7 +284,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
             }
         }
 
-        // ===== Landing footer (separate from platform footer) =====
+        // ===== Landing footer =====
         footer { class: "landing-footer",
             div { class: "landing-footer-inner",
                 div { class: "landing-footer-brand",
@@ -251,7 +302,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 }
                 div { class: "landing-footer-info",
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.1.0 — Junio 2026" }
+                    p { class: "footer-version", "v0.2.1 · Junio 2026" }
                 }
             }
         }
@@ -277,7 +328,7 @@ pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
                     onclick: move |_| on_navigate.call(Page::Passenger),
                     div { class: "platform-card-icon", "🧭" }
                     h3 { "Buscar viaje" }
-                    p { "Encuentra conductores que van en tu misma dirección. Matching con geohash + Haversine." }
+                    p { "Encuentra conductores que van en tu misma dirección. Matching con geohash + haversine + dirección + tiempo." }
                     span { class: "platform-card-arrow", "→" }
                 }
                 div {
@@ -285,7 +336,7 @@ pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
                     onclick: move |_| on_navigate.call(Page::Driver),
                     div { class: "platform-card-icon", "🚗" }
                     h3 { "Publicar ruta" }
-                    p { "Publica tu ruta como conductor. Recibe pasajeros que van en tu misma dirección." }
+                    p { "Publica tu ruta como conductor. Recibe pasajeros que van en tu misma dirección en tiempo real." }
                     span { class: "platform-card-arrow", "→" }
                 }
                 div {
@@ -293,7 +344,7 @@ pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
                     onclick: move |_| on_navigate.call(Page::About),
                     div { class: "platform-card-icon", "ℹ️" }
                     h3 { "Acerca de la demo" }
-                    p { "Qué es real, qué es placeholder, qué es reutilizable. Tabla detallada." }
+                    p { "Qué es real, qué es placeholder, qué es reutilizable. Tabla detallada + 8 endpoints documentados." }
                     span { class: "platform-card-arrow", "→" }
                 }
             }
