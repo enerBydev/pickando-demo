@@ -86,9 +86,7 @@ pub fn validate_departure_time(s: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    Err(format!(
-        "departure_time must be HH:MM or ISO-8601, got: '{s}'"
-    ))
+    Err(format!("departure_time must be HH:MM or ISO-8601, got: '{s}'"))
 }
 
 // ===========================================================================
@@ -224,10 +222,7 @@ pub async fn create_route(
     }
 
     let body: CreateRouteRequest = serde_json::from_value(value).map_err(|e| {
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            format!("invalid CreateRouteRequest: {e}"),
-        )
+        (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid CreateRouteRequest: {e}"))
     })?;
 
     tracing::info!(
@@ -366,10 +361,7 @@ pub async fn request_ride(
     }
 
     let body: CreateRideRequest = serde_json::from_value(value).map_err(|e| {
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            format!("invalid CreateRideRequest: {e}"),
-        )
+        (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid CreateRideRequest: {e}"))
     })?;
 
     // Validate body
@@ -464,42 +456,26 @@ pub async fn find_matches(
         ));
     }
 
-    let body: MatchRequest = serde_json::from_value(value).map_err(|e| {
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            format!("invalid MatchRequest: {e}"),
-        )
-    })?;
+    let body: MatchRequest = serde_json::from_value(value)
+        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid MatchRequest: {e}")))?;
 
     // Validate radius_km explicitly (do NOT silently clamp invalid values)
     if let Some(r) = body.radius_km {
         if !r.is_finite() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "radius_km must be a finite number".into(),
-            ));
+            return Err((StatusCode::BAD_REQUEST, "radius_km must be a finite number".into()));
         }
         if r <= 0.0 {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("radius_km must be > 0, got {r}"),
-            ));
+            return Err((StatusCode::BAD_REQUEST, format!("radius_km must be > 0, got {r}")));
         }
         if r > 200.0 {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("radius_km must be <= 200, got {r}"),
-            ));
+            return Err((StatusCode::BAD_REQUEST, format!("radius_km must be <= 200, got {r}")));
         }
     }
 
     // Validate bearing range if provided
     if let Some(b) = body.passenger_bearing_deg {
         if !b.is_finite() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "passenger_bearing_deg must be finite".into(),
-            ));
+            return Err((StatusCode::BAD_REQUEST, "passenger_bearing_deg must be finite".into()));
         }
     }
 
@@ -668,9 +644,10 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 3,
         };
-        let (status, Json(route)) = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
-            .await
-            .expect("should succeed");
+        let (status, Json(route)) =
+            create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
+                .await
+                .expect("should succeed");
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(route.origin_address, "Zócalo");
         assert_eq!(route.seats_available, 3);
@@ -696,7 +673,12 @@ mod tests {
             passenger_name: "María".into(),
             seats_requested: 1,
         };
-        let result = request_ride(State(state), Path("no-such-route".into()), Json(serde_json::to_value(&body).unwrap())).await;
+        let result = request_ride(
+            State(state),
+            Path("no-such-route".into()),
+            Json(serde_json::to_value(&body).unwrap()),
+        )
+        .await;
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::NOT_FOUND);
@@ -717,9 +699,10 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 2,
         };
-        let (_, Json(route)) = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
-            .await
-            .unwrap();
+        let (_, Json(route)) =
+            create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
+                .await
+                .unwrap();
 
         // Request 5 seats (more than available)
         let req = CreateRideRequest {
@@ -727,7 +710,12 @@ mod tests {
             passenger_name: "María".into(),
             seats_requested: 5,
         };
-        let result = request_ride(State(state), Path(route.id.clone()), Json(serde_json::to_value(&req).unwrap())).await;
+        let result = request_ride(
+            State(state),
+            Path(route.id.clone()),
+            Json(serde_json::to_value(&req).unwrap()),
+        )
+        .await;
         assert!(result.is_err());
         let (status, msg) = result.unwrap_err();
         assert_eq!(status, StatusCode::CONFLICT);
@@ -748,19 +736,23 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 3,
         };
-        let (_, Json(route)) = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
-            .await
-            .unwrap();
+        let (_, Json(route)) =
+            create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
+                .await
+                .unwrap();
 
         let req_body = CreateRideRequest {
             passenger_id: None,
             passenger_name: "Carlos".into(),
             seats_requested: 2,
         };
-        let (status, Json(req)) =
-            request_ride(State(state.clone()), Path(route.id.clone()), Json(serde_json::to_value(&req_body).unwrap()))
-                .await
-                .expect("should succeed");
+        let (status, Json(req)) = request_ride(
+            State(state.clone()),
+            Path(route.id.clone()),
+            Json(serde_json::to_value(&req_body).unwrap()),
+        )
+        .await
+        .expect("should succeed");
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(req.route_id, route.id);
         assert_eq!(req.passenger_name, "Carlos");
@@ -788,7 +780,8 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 3,
         };
-        let _ = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap())).await;
+        let _ =
+            create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap())).await;
 
         let req = MatchRequest {
             lat: 19.4326,
@@ -862,7 +855,8 @@ mod tests {
             departure_time: "2026-06-17T08:00:00Z".into(),
             seats_available: 2,
         };
-        let result = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap())).await;
+        let result =
+            create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap())).await;
         assert!(result.is_ok());
         assert_eq!(state.routes.read().await.len(), 1);
     }
@@ -966,12 +960,7 @@ mod tests {
     async fn request_ride_rejects_array_body() {
         let state = test_state();
         let array_json = serde_json::json!([1, 2, 3]);
-        let result = request_ride(
-            State(state),
-            Path("any-route".into()),
-            Json(array_json),
-        )
-        .await;
+        let result = request_ride(State(state), Path("any-route".into()), Json(array_json)).await;
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -1028,13 +1017,15 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 2,
         };
-        create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
+        let _ = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
             .await
             .unwrap();
         assert_eq!(state.routes.read().await.len(), 1);
 
         // Reset
-        let Json(resp) = demo_reset(State(state.clone())).await.expect("should succeed");
+        let Json(resp) = demo_reset(State(state.clone()))
+            .await
+            .expect("should succeed");
         assert_eq!(resp["status"], "ok");
         assert_eq!(resp["ride_requests_count"], 0);
 
