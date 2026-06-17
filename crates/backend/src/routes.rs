@@ -148,7 +148,7 @@ pub async fn stats(State(state): State<Arc<AppState>>) -> Json<StatsResponse> {
         requests_served: state
             .request_counter
             .load(std::sync::atomic::Ordering::Relaxed),
-        avg_relevance_score: None,
+        avg_relevance_score: state.avg_relevance_score().await,
     };
 
     for r in routes.iter() {
@@ -528,6 +528,10 @@ pub async fn find_matches(
     } else {
         find_matching_routes(lat, lng, &routes, radius)
     };
+
+    // Record relevance scores for stats averaging
+    let scores: Vec<f64> = matches.iter().map(|m| m.relevance_score).collect();
+    state.record_relevance_scores(&scores).await;
 
     tracing::info!("Found {} matches for ({}, {})", matches.len(), lat, lng);
     Ok(Json(matches))
