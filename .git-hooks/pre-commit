@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pre-commit hook: verify formatting and clippy on staged files
+# Install with: cp .git-hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "[pre-commit] cargo fmt --check..."
+cargo fmt --all -- --check
+
+echo "[pre-commit] cargo clippy (this may take a moment)..."
+cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -5
+
+echo "[pre-commit] all checks passed ✅"

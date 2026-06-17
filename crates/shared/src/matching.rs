@@ -93,26 +93,19 @@ pub fn find_matching_routes(
                 return None;
             }
 
-            let distance = haversine_km(
-                passenger_lat,
-                passenger_lng,
-                route.origin_lat,
-                route.origin_lng,
-            );
+            let distance =
+                haversine_km(passenger_lat, passenger_lng, route.origin_lat, route.origin_lng);
 
             if distance > radius_km {
                 return None;
             }
 
-            let direction_similarity = compute_direction_similarity(route, passenger_lat, passenger_lng);
+            let direction_similarity =
+                compute_direction_similarity(route, passenger_lat, passenger_lng);
             let time_compatibility = compute_time_compatibility(route);
 
-            let relevance_score = compute_relevance(
-                distance,
-                radius_km,
-                direction_similarity,
-                time_compatibility,
-            );
+            let relevance_score =
+                compute_relevance(distance, radius_km, direction_similarity, time_compatibility);
 
             Some(MatchResult {
                 route: route.clone(),
@@ -337,10 +330,7 @@ mod tests {
     fn test_haversine_known_distance() {
         // CDMX Zocalo to Polanco ≈ 11.5 km
         let dist = haversine_km(19.4326, -99.1332, 19.4330, -99.1930);
-        assert!(
-            dist > 5.0 && dist < 15.0,
-            "CDMX to Polanco should be ~11 km, got {dist}"
-        );
+        assert!(dist > 5.0 && dist < 15.0, "CDMX to Polanco should be ~11 km, got {dist}");
     }
 
     #[test]
@@ -358,11 +348,7 @@ mod tests {
         let ab = haversine_km(a.0, a.1, b.0, b.1);
         let bc = haversine_km(b.0, b.1, c.0, c.1);
         let ac = haversine_km(a.0, a.1, c.0, c.1);
-        assert!(
-            ac <= ab + bc + 1e-6,
-            "triangle inequality violated: ac={ac}, ab+bc={}",
-            ab + bc
-        );
+        assert!(ac <= ab + bc + 1e-6, "triangle inequality violated: ac={ac}, ab+bc={}", ab + bc);
     }
 
     // ----- find_matching_routes -----
@@ -402,7 +388,7 @@ mod tests {
         let routes = vec![
             sample_route("far", 19.4500, -99.1300, 19.4600, -99.1000), // ~2 km
             sample_route("near", 19.4330, -99.1330, 19.4500, -99.1100), // ~0.1 km
-            sample_route("mid", 19.4400, -99.1350, 19.4600, -99.1100),  // ~0.9 km
+            sample_route("mid", 19.4400, -99.1350, 19.4600, -99.1100), // ~0.9 km
         ];
         let matches = find_matching_routes(19.4326, -99.1332, &routes, 10.0);
         assert!(matches.len() >= 2);
@@ -584,7 +570,7 @@ mod tests {
     fn test_geohash_proximity_different_hemisphere() {
         let g1 = encode_geohash(19.4326, -99.1332, 6); // CDMX
         let g2 = encode_geohash(25.6487, -100.4412, 6); // Monterrey
-        // Should be > 200km → 500
+                                                        // Should be > 200km → 500
         assert!(geohash_proximity(&g1, &g2) > 100.0);
     }
 

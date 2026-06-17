@@ -1,0 +1,20 @@
+# Don't send these to the Docker builder — keeps build context small
+.git/
+.github/
+.vscode/
+.idea/
+target/
+**/target/
+docs/
+*.md
+!README.md
+.env
+.env.local
+.env.production
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+dist/
+.Dioxus/
+crates/frontend/dist/

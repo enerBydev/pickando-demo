@@ -389,7 +389,11 @@ pub struct WsMessage {
 
 impl WsMessage {
     /// Construct a typed message with JSON data.
-    pub fn new<T: Serialize>(msg_type: impl Into<String>, message: impl Into<String>, data: &T) -> Self {
+    pub fn new<T: Serialize>(
+        msg_type: impl Into<String>,
+        message: impl Into<String>,
+        data: &T,
+    ) -> Self {
         Self {
             msg_type: msg_type.into(),
             message: message.into(),
@@ -451,10 +455,7 @@ impl WsMessage {
 
     /// Convenience constructor for `route_cancelled` broadcast.
     pub fn route_cancelled(route_id: &str) -> Self {
-        Self::text(
-            "route_cancelled",
-            format!("Ruta cancelada: {route_id}"),
-        )
+        Self::text("route_cancelled", format!("Ruta cancelada: {route_id}"))
     }
 
     /// Convenience constructor for `ride_request` broadcast.
@@ -609,10 +610,7 @@ mod tests {
             created_at_ms: 0,
         };
         let bearing = route.bearing_deg().expect("should have a bearing");
-        assert!(
-            (bearing - 90.0).abs() < 2.0,
-            "east bearing should be ~90, got {bearing}"
-        );
+        assert!((bearing - 90.0).abs() < 2.0, "east bearing should be ~90, got {bearing}");
     }
 
     #[test]
