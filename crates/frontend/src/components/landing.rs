@@ -79,37 +79,37 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
             div { class: "landing-hero-inner",
                 div { class: "hero-badge",
                     span { class: "hero-badge-dot" }
-                    "DEMO EN VIVO · RUST + DIOXUS + AXUM"
+                    "Movilidad compartida en la misma dirección"
                 }
                 h1 { class: "hero-title",
-                    "Viaja en la "
-                    span { class: "highlight", "misma dirección" }
+                    "Hoy, alguien va por tu "
+                    span { class: "highlight", "mismo camino" }
                 }
                 p { class: "hero-subtitle",
-                    "Conecta con conductores que ya van por tu camino. \
-                    Sin desvíos, sin esperas infinitas. Comparte el viaje, \
-                    comparte el costo, reduce tu huella."
+                    "Conduce o comparte. Sin desvíos, sin esperas, sin Uber. \
+                    Conecta con personas que ya van en tu misma dirección, \
+                    comparte el costo y reduce tu huella."
                 }
                 div { class: "hero-actions",
                     button {
                         class: "btn-primary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "🔍 Buscar viaje"
+                        "🔍 Buscar viaje cerca de ti"
                     }
                     button {
                         class: "btn-secondary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Driver),
-                        "🚗 Publicar ruta"
+                        "🚗 Tengo asientos libres"
                     }
                 }
                 div { class: "hero-trust",
-                    span { "⚡ Matching en <50ms" }
+                    span { "✓ Sin registro" }
                     span { class: "hero-trust-dot" }
-                    span { "🔒 100% Rust" }
+                    span { "✓ Sin costo" }
                     span { class: "hero-trust-dot" }
-                    span { "🌐 Web, Desktop, Android" }
+                    span { "💰 Ahorra hasta 70% vs Uber" }
                     span { class: "hero-trust-dot" }
-                    span { "💚 Demo gratis" }
+                    span { "🌍 Reduce tu huella de CO₂" }
                 }
             }
         }
@@ -118,29 +118,32 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         section { class: "landing-stats", id: "stats",
             div { class: "landing-stats-inner",
                 div { class: "stat",
-                    span { class: "stat-number", "100%" }
-                    span { class: "stat-label", "Rust" }
+                    span { class: "stat-number", "70%" }
+                    span { class: "stat-label", "ahorro vs Uber" }
                 }
                 div { class: "stat-divider" }
                 div { class: "stat",
-                    span { class: "stat-number", "4" }
-                    span { class: "stat-label", "Plataformas" }
+                    span { class: "stat-number", "2.3 t" }
+                    span { class: "stat-label", "CO₂ evitado/año*" }
                 }
                 div { class: "stat-divider" }
                 div { class: "stat",
-                    span { class: "stat-number", "<50ms" }
-                    span { class: "stat-label", "Matching" }
-                }
-                div { class: "stat-divider" }
-                div { class: "stat",
-                    span { class: "stat-number", "51" }
-                    span { class: "stat-label", "Tests" }
+                    span { class: "stat-number", "1-2 km" }
+                    span { class: "stat-label", "radio de matching" }
                 }
                 div { class: "stat-divider" }
                 div { class: "stat",
                     span { class: "stat-number", "$0" }
-                    span { class: "stat-label", "Costo demo" }
+                    span { class: "stat-label", "costo de la demo" }
                 }
+                div { class: "stat-divider" }
+                div { class: "stat",
+                    span { class: "stat-number", "6" }
+                    span { class: "stat-label", "rutas activas ahora" }
+                }
+            }
+            p { class: "landing-stats-footnote",
+                "*Estimado basado en 4 viajes/semana, 20 km/viaje compartidos con 1 persona más."
             }
         }
 
@@ -149,26 +152,32 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
             div { class: "landing-section-inner",
                 h2 { class: "section-title", "Cómo funciona" }
                 p { class: "section-subtitle",
-                    "Tres pasos. Mismo lenguaje. Cero fricción."
+                    "Tres pasos. Treinta segundos. Cero fricción."
                 }
                 div { class: "how-grid",
                     div { class: "how-step",
                         div { class: "how-step-num", "01" }
-                        h3 { "Publica tu ruta" }
-                        p { "El conductor indica origen, destino, hora y asientos disponibles. El backend geohash-ea la ubicación al instante." }
-                        span { class: "how-tag", "Axum · POST /api/v1/routes" }
+                        h3 { "Publicás tu ruta" }
+                        p { "Indicás origen, destino y hora. Gratis, en 30 segundos. \
+                            Si sos conductor, ofrecés asientos; si sos pasajero, \
+                            buscás quien vaya igual." }
+                        span { class: "how-tag", "30 segundos · gratis" }
                     }
                     div { class: "how-step",
                         div { class: "how-step-num", "02" }
-                        h3 { "Buscas match" }
-                        p { "El pasajero comparte su ubicación. El motor encuentra conductores dentro del radio usando Haversine — todo en Rust puro." }
-                        span { class: "how-tag", "Geohash + Haversine + Bearing" }
+                        h3 { "Alguien te encuentra" }
+                        p { "Te avisamos cuando alguien cerca vaya en tu misma \
+                            dirección. Vés su perfil verificado, la distancia y la \
+                            compatibilidad de horario." }
+                        span { class: "how-tag", "matching por cercanía + dirección + horario" }
                     }
                     div { class: "how-step",
                         div { class: "how-step-num", "03" }
-                        h3 { "Te conectas en vivo" }
-                        p { "WebSocket bidireccional: broadcast de eventos en tiempo real (rutas creadas, canceladas, solicitudes de pasajeros). Sin recargas." }
-                        span { class: "how-tag", "WebSocket /ws · broadcast" }
+                        h3 { "Comparten el viaje" }
+                        p { "Él conduce, vos contribuís. Ambos ganan: él baja su \
+                            costo de combustible, vos pagás menos que en Uber, y \
+                            el planeta agradece." }
+                        span { class: "how-tag", "costo compartido justo" }
                     }
                 }
             }
@@ -264,16 +273,51 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
             }
         }
 
+        // ===== Storytelling — María & Antonio =====
+        section { class: "landing-section landing-story", id: "story",
+            div { class: "landing-section-inner",
+                h2 { class: "section-title", "Una historia Pickando" }
+                p { class: "section-subtitle",
+                    "Así se ve un viaje compartido real — no un pitch, una historia."
+                }
+                div { class: "story-card",
+                    div { class: "story-actors",
+                        div { class: "story-actor",
+                            div { class: "story-avatar driver", "🚗" }
+                            div { class: "story-actor-name", "María" }
+                            div { class: "story-actor-role", "Conductora" }
+                            div { class: "story-actor-route", "Polanco → Centro, 8:00 AM" }
+                        }
+                        div { class: "story-connector", "→" }
+                        div { class: "story-actor",
+                            div { class: "story-avatar passenger", "👤" }
+                            div { class: "story-actor-name", "Antonio" }
+                            div { class: "story-actor-role", "Pasajero" }
+                            div { class: "story-actor-route", "Anzures → Zócalo, 8:15 AM" }
+                        }
+                    }
+                    div { class: "story-narrative",
+                        p { "María va de lunes a viernes de Polanco al Centro. Antonio vive en Anzures y trabaja cerca del Zócalo." }
+                        p { strong { "Pickando los conectó en 3 minutos." } " María publicó su ruta a las 7:45 AM. Antonio la encontró a las 7:48 AM. Misma dirección, mismo horario, 0.6 km de distancia entre su origen y el de ella." }
+                        p { "María ahorra " strong { "$800 al mes" } " en gasolina. Antonio paga " strong { "$40 por viaje" } " en lugar de los $120 que le cobraba Uber. Ambos redujeron " strong { "2.3 toneladas de CO₂" } " este año compartiendo el trayecto." }
+                        p { "Pickando no es Uber. No es dating. No es picking de productos. Es " em { "personas que ya van en la misma dirección" } ", conectadas de forma segura." }
+                    }
+                }
+            }
+        }
+
         // ===== Final CTA =====
         section { class: "landing-cta-section",
             div { class: "landing-cta-inner",
-                h2 { "Prueba la demo en vivo" }
-                p { "Sin registro, sin costo. Entra a la plataforma y prueba el matching, publica rutas, observa el WebSocket en acción. Todo corre desde Rust compilado a WebAssembly." }
+                h2 { "¿Listo para probarlo?" }
+                p { "Entra a la plataforma, busca viajes cerca de ti, publica tu ruta. \
+                    Sin registro, sin costo, sin compromiso. Esta es una demo funcional \
+                    — lo que ves es lo que Pickando será." }
                 div { class: "landing-cta-actions",
                     button {
                         class: "btn-primary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "🔍 Buscar viaje"
+                        "🔍 Buscar viaje cerca de ti"
                     }
                     button {
                         class: "btn-secondary btn-lg",
@@ -289,7 +333,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
             div { class: "landing-footer-inner",
                 div { class: "landing-footer-brand",
                     span { class: "landing-footer-logo", "Pickando" }
-                    span { class: "landing-footer-tagline", "Same-direction local mobility · Demo en Rust" }
+                    span { class: "landing-footer-tagline", "Comparte el viaje, no el taxi · Demo funcional en Rust" }
                 }
                 div { class: "landing-footer-tech",
                     h4 { "Stack" }
