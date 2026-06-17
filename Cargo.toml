@@ -3,11 +3,11 @@ resolver = "2"
 members = ["crates/shared", "crates/backend", "crates/frontend"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/enerBydev/pickando-demo"
-homepage = "https://pickando-demo.up.railway.app"
+homepage = "https://pickando-demo-production.up.railway.app"
 documentation = "https://github.com/enerBydev/pickando-demo#readme"
 readme = "README.md"
 keywords = ["rideshare", "mobility", "rust", "dioxus", "axum"]
