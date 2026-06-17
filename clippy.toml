@@ -1,0 +1,10 @@
+# Clippy configuration — Pickando Demo
+# Strict lints for enterprise-grade Rust code.
+# https://doc.rust-lang.org/clippy/configuration.html
+
+msrv = "1.96"
+type-complexity-threshold = 250
+too-many-arguments-threshold = 7
+
+# Warn on common foot-guns
+warn-on-all-wasm-bindgen = true
