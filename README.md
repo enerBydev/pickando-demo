@@ -6,7 +6,7 @@
 [![Dioxus](https://img.shields.io/badge/dioxus-0.7-blueviolet.svg)](https://dioxuslabs.com/)
 [![Axum](https://img.shields.io/badge/axum-0.8-blue.svg)](https://github.com/tokio-rs/axum)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Live demo](https://img.shields.io/badge/live-demo-00FF88.svg)](https://pickando-demo.up.railway.app)
+[![Live demo](https://img.shields.io/badge/live-demo-00FF88.svg)](https://pickando-demo-production.up.railway.app)
 
 > Demo funcional en Rust puro: **Dioxus 0.7** (WASM) + **Axum 0.8** + **Tokio**.
 > Matching multi-factor (geohash + haversine + bearing + tiempo), WebSocket
@@ -47,9 +47,9 @@
 
 ## Demo en vivo
 
-- **App web:** <https://pickando-demo.up.railway.app>
-- **API health:** <https://pickando-demo.up.railway.app/api/v1/health>
-- **API stats:** <https://pickando-demo.up.railway.app/api/v1/stats>
+- **App web:** <https://pickando-demo-production.up.railway.app>
+- **API health:** <https://pickando-demo-production.up.railway.app/api/v1/health>
+- **API stats:** <https://pickando-demo-production.up.railway.app/api/v1/stats>
 - **Repositorio:** <https://github.com/enerBydev/pickando-demo>
 - **APK Android:** ver [Releases](https://github.com/enerBydev/pickando-demo/releases)
 
@@ -105,18 +105,18 @@ Referencia completa: [`docs/API.md`](docs/API.md).
 
 ```bash
 # Health check
-curl https://pickando-demo.up.railway.app/api/v1/health
+curl https://pickando-demo-production.up.railway.app/api/v1/health
 
 # Stats
-curl https://pickando-demo.up.railway.app/api/v1/stats
+curl https://pickando-demo-production.up.railway.app/api/v1/stats
 
 # Matching (CDMX Zócalo, radio 5km)
-curl -X POST https://pickando-demo.up.railway.app/api/v1/match \
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/match \
   -H "Content-Type: application/json" \
   -d '{"lat": 19.4326, "lng": -99.1332, "radius_km": 5}'
 
 # Matching avanzado (con dirección + ventana temporal)
-curl -X POST https://pickando-demo.up.railway.app/api/v1/match \
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/match \
   -H "Content-Type: application/json" \
   -d '{
     "lat": 19.4326,
@@ -128,7 +128,7 @@ curl -X POST https://pickando-demo.up.railway.app/api/v1/match \
   }'
 
 # Crear ruta
-curl -X POST https://pickando-demo.up.railway.app/api/v1/routes \
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/routes \
   -H "Content-Type: application/json" \
   -d '{
     "origin_address": "Zócalo, CDMX",
@@ -138,12 +138,12 @@ curl -X POST https://pickando-demo.up.railway.app/api/v1/routes \
   }'
 
 # Solicitar unirse a una ruta
-curl -X POST https://pickando-demo.up.railway.app/api/v1/routes/route-001/request \
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/routes/route-001/request \
   -H "Content-Type: application/json" \
   -d '{"passenger_name":"María","seats_requested":1}'
 
 # Cancelar una ruta
-curl -X DELETE https://pickando-demo.up.railway.app/api/v1/routes/route-002
+curl -X DELETE https://pickando-demo-production.up.railway.app/api/v1/routes/route-002
 
 # WebSocket
 wscat -c wss://pickando-demo.up.railway.app/ws
@@ -283,7 +283,7 @@ El workflow `.github/workflows/ci.yml` corre en cada push y PR:
 1. Conectar el repo en Railway
 2. Railway detecta el `Dockerfile` automáticamente
 3. Deploy automático en cada push a `main`
-4. URL pública: <https://pickando-demo.up.railway.app>
+4. URL pública: <https://pickando-demo-production.up.railway.app>
 
 `railway.json` configura:
 - `startCommand`: `/app/pickando-backend`

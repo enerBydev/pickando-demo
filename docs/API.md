@@ -1,6 +1,6 @@
 # Pickando Demo — REST API Reference
 
-> Base URL (production): `https://pickando-demo.up.railway.app`
+> Base URL (production): `https://pickando-demo-production.up.railway.app`
 > Base URL (local): `http://localhost:3000`
 
 All endpoints accept and return `application/json` unless otherwise noted.
