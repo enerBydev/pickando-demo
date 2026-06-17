@@ -24,6 +24,74 @@ use std::sync::Arc;
 use crate::state::AppState;
 
 // ===========================================================================
+// Validation helpers
+// ===========================================================================
+
+/// Validate that a departure_time string is parseable.
+///
+/// Accepts:
+///   - `HH:MM` (24-hour, e.g. "08:30", "17:45")
+///   - `HH:MM:SS` (e.g. "08:30:00")
+///   - ISO-8601 / RFC 3339 (e.g. "2026-06-17T08:30:00Z", "2026-06-17 08:30:00+00:00")
+///
+/// Rejects:
+///   - Empty strings
+///   - Strings like "not-a-time", "banana", "999-99-99"
+///   - Out-of-range hours/minutes (e.g. "25:99")
+pub fn validate_departure_time(s: &str) -> Result<(), String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Err("departure_time must not be empty".into());
+    }
+
+    // Try HH:MM
+    if s.len() == 5 && s.as_bytes().get(2) == Some(&b':') {
+        let h: u32 = s[..2]
+            .parse()
+            .map_err(|_| format!("invalid hour in departure_time: '{s}'"))?;
+        let m: u32 = s[3..]
+            .parse()
+            .map_err(|_| format!("invalid minute in departure_time: '{s}'"))?;
+        if h < 24 && m < 60 {
+            return Ok(());
+        }
+        return Err(format!("departure_time out of range: '{s}'"));
+    }
+
+    // Try HH:MM:SS
+    if s.len() == 8 && s.as_bytes().get(2) == Some(&b':') && s.as_bytes().get(5) == Some(&b':') {
+        let h: u32 = s[..2]
+            .parse()
+            .map_err(|_| format!("invalid hour in departure_time: '{s}'"))?;
+        let m: u32 = s[3..5]
+            .parse()
+            .map_err(|_| format!("invalid minute in departure_time: '{s}'"))?;
+        let sec: u32 = s[6..]
+            .parse()
+            .map_err(|_| format!("invalid second in departure_time: '{s}'"))?;
+        if h < 24 && m < 60 && sec < 60 {
+            return Ok(());
+        }
+        return Err(format!("departure_time out of range: '{s}'"));
+    }
+
+    // Try ISO-8601 / RFC 3339
+    if chrono::DateTime::parse_from_rfc3339(s).is_ok() {
+        return Ok(());
+    }
+    if chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").is_ok() {
+        return Ok(());
+    }
+    if chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").is_ok() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "departure_time must be HH:MM or ISO-8601, got: '{s}'"
+    ))
+}
+
+// ===========================================================================
 // Health
 // ===========================================================================
 
@@ -80,7 +148,7 @@ pub async fn stats(State(state): State<Arc<AppState>>) -> Json<StatsResponse> {
         requests_served: state
             .request_counter
             .load(std::sync::atomic::Ordering::Relaxed),
-        avg_relevance_score: None,
+        avg_relevance_score: state.avg_relevance_score().await,
     };
 
     for r in routes.iter() {
@@ -140,9 +208,27 @@ pub async fn get_route(
 /// `route_created` WebSocket event, and returns the new Route.
 pub async fn create_route(
     State(state): State<Arc<AppState>>,
-    Json(body): Json<CreateRouteRequest>,
+    Json(value): Json<serde_json::Value>,
 ) -> Result<(StatusCode, Json<Route>), (StatusCode, String)> {
     state.record_request();
+
+    // Reject non-object bodies (arrays, strings, numbers, nulls).
+    // serde accepts arrays as seq representation of structs by default,
+    // which is a foot-gun: POST /routes with `[1,2,3]` would otherwise
+    // be deserialized into a CreateRouteRequest with bogus fields.
+    if !value.is_object() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "request body must be a JSON object".into(),
+        ));
+    }
+
+    let body: CreateRouteRequest = serde_json::from_value(value).map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("invalid CreateRouteRequest: {e}"),
+        )
+    })?;
 
     tracing::info!(
         "Route creation requested: {} -> {} ({} seats)",
@@ -160,6 +246,10 @@ pub async fn create_route(
     }
     if body.seats_available == 0 || body.seats_available > 6 {
         return Err((StatusCode::BAD_REQUEST, "seats_available must be between 1 and 6".into()));
+    }
+    // Validate departure_time format (HH:MM or ISO-8601)
+    if let Err(msg) = validate_departure_time(&body.departure_time) {
+        return Err((StatusCode::BAD_REQUEST, msg));
     }
     // Validate optional coordinates
     for (label, lat, lng) in [
@@ -263,9 +353,24 @@ pub async fn cancel_route(
 pub async fn request_ride(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-    Json(body): Json<CreateRideRequest>,
+    Json(value): Json<serde_json::Value>,
 ) -> Result<(StatusCode, Json<RideRequest>), (StatusCode, String)> {
     state.record_request();
+
+    // Reject non-object bodies (arrays, strings, numbers, nulls).
+    if !value.is_object() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "request body must be a JSON object".into(),
+        ));
+    }
+
+    let body: CreateRideRequest = serde_json::from_value(value).map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("invalid CreateRideRequest: {e}"),
+        )
+    })?;
 
     // Validate body
     if body.passenger_name.trim().is_empty() {
@@ -346,9 +451,57 @@ pub async fn request_ride(
 /// `find_matching_routes_with_request` path with direction + time scoring.
 pub async fn find_matches(
     State(state): State<Arc<AppState>>,
-    Json(body): Json<MatchRequest>,
+    Json(value): Json<serde_json::Value>,
 ) -> Result<Json<Vec<pickando_shared::models::MatchResult>>, (StatusCode, String)> {
     state.record_request();
+
+    // Reject non-object bodies (arrays, strings, numbers, nulls).
+    // See create_route for the rationale.
+    if !value.is_object() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "request body must be a JSON object".into(),
+        ));
+    }
+
+    let body: MatchRequest = serde_json::from_value(value).map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("invalid MatchRequest: {e}"),
+        )
+    })?;
+
+    // Validate radius_km explicitly (do NOT silently clamp invalid values)
+    if let Some(r) = body.radius_km {
+        if !r.is_finite() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "radius_km must be a finite number".into(),
+            ));
+        }
+        if r <= 0.0 {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("radius_km must be > 0, got {r}"),
+            ));
+        }
+        if r > 200.0 {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("radius_km must be <= 200, got {r}"),
+            ));
+        }
+    }
+
+    // Validate bearing range if provided
+    if let Some(b) = body.passenger_bearing_deg {
+        if !b.is_finite() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "passenger_bearing_deg must be finite".into(),
+            ));
+        }
+    }
 
     let req = body.clone().sanitized();
     let lat = req.lat;
@@ -376,8 +529,66 @@ pub async fn find_matches(
         find_matching_routes(lat, lng, &routes, radius)
     };
 
+    // Record relevance scores for stats averaging
+    let scores: Vec<f64> = matches.iter().map(|m| m.relevance_score).collect();
+    state.record_relevance_scores(&scores).await;
+
     tracing::info!("Found {} matches for ({}, {})", matches.len(), lat, lng);
     Ok(Json(matches))
+}
+
+// ===========================================================================
+// Demo management
+// ===========================================================================
+
+/// POST /api/v1/demo-reset — Reset the demo state to initial seed routes.
+///
+/// This endpoint is useful for keeping the public demo clean: when visitors
+/// create spam routes or leave garbage data, anyone can call this endpoint
+/// to restore the demo to its initial 6 seed routes.
+///
+/// No authentication is required (this is a demo, after all), but the
+/// endpoint is rate-limited naturally by the in-memory state reset.
+///
+/// Returns the new state stats so the caller can verify the reset worked.
+pub async fn demo_reset(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    state.record_request();
+
+    tracing::info!("Demo reset requested — clearing all state");
+
+    // Clear all routes and ride requests
+    {
+        let mut routes = state.routes.write().await;
+        routes.clear();
+    }
+    {
+        let mut ride_requests = state.ride_requests.write().await;
+        ride_requests.clear();
+    }
+    // Clear the relevance score history too
+    {
+        let mut history = state.recent_relevance_scores.write().await;
+        history.clear();
+    }
+
+    // Re-seed with the initial sample routes
+    let seed_routes = crate::init_sample_routes();
+    let seed_count = seed_routes.len();
+    {
+        let mut routes = state.routes.write().await;
+        *routes = seed_routes;
+    }
+
+    tracing::info!("Demo reset complete — {seed_count} seed routes restored");
+
+    Ok(Json(serde_json::json!({
+        "status": "ok",
+        "message": "Demo state reset to initial seeds",
+        "routes_count": seed_count,
+        "ride_requests_count": 0,
+    })))
 }
 
 // ===========================================================================
@@ -417,7 +628,7 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 2,
         };
-        let result = create_route(State(state), Json(body)).await;
+        let result = create_route(State(state), Json(serde_json::to_value(&body).unwrap())).await;
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -437,7 +648,7 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 10,
         };
-        let result = create_route(State(state), Json(body)).await;
+        let result = create_route(State(state), Json(serde_json::to_value(&body).unwrap())).await;
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -457,7 +668,7 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 3,
         };
-        let (status, Json(route)) = create_route(State(state.clone()), Json(body))
+        let (status, Json(route)) = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
             .await
             .expect("should succeed");
         assert_eq!(status, StatusCode::CREATED);
@@ -485,7 +696,7 @@ mod tests {
             passenger_name: "María".into(),
             seats_requested: 1,
         };
-        let result = request_ride(State(state), Path("no-such-route".into()), Json(body)).await;
+        let result = request_ride(State(state), Path("no-such-route".into()), Json(serde_json::to_value(&body).unwrap())).await;
         assert!(result.is_err());
         let (status, _) = result.unwrap_err();
         assert_eq!(status, StatusCode::NOT_FOUND);
@@ -506,7 +717,7 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 2,
         };
-        let (_, Json(route)) = create_route(State(state.clone()), Json(body))
+        let (_, Json(route)) = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
             .await
             .unwrap();
 
@@ -516,7 +727,7 @@ mod tests {
             passenger_name: "María".into(),
             seats_requested: 5,
         };
-        let result = request_ride(State(state), Path(route.id.clone()), Json(req)).await;
+        let result = request_ride(State(state), Path(route.id.clone()), Json(serde_json::to_value(&req).unwrap())).await;
         assert!(result.is_err());
         let (status, msg) = result.unwrap_err();
         assert_eq!(status, StatusCode::CONFLICT);
@@ -537,7 +748,7 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 3,
         };
-        let (_, Json(route)) = create_route(State(state.clone()), Json(body))
+        let (_, Json(route)) = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
             .await
             .unwrap();
 
@@ -547,7 +758,7 @@ mod tests {
             seats_requested: 2,
         };
         let (status, Json(req)) =
-            request_ride(State(state.clone()), Path(route.id.clone()), Json(req_body))
+            request_ride(State(state.clone()), Path(route.id.clone()), Json(serde_json::to_value(&req_body).unwrap()))
                 .await
                 .expect("should succeed");
         assert_eq!(status, StatusCode::CREATED);
@@ -577,7 +788,7 @@ mod tests {
             departure_time: "08:00".into(),
             seats_available: 3,
         };
-        let _ = create_route(State(state.clone()), Json(body)).await;
+        let _ = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap())).await;
 
         let req = MatchRequest {
             lat: 19.4326,
@@ -587,7 +798,7 @@ mod tests {
             time_window_minutes: None,
             passenger_departure_time: None,
         };
-        let Json(matches) = find_matches(State(state), Json(req))
+        let Json(matches) = find_matches(State(state), Json(serde_json::to_value(&req).unwrap()))
             .await
             .expect("should succeed");
         assert!(!matches.is_empty());
@@ -605,10 +816,245 @@ mod tests {
             time_window_minutes: None,
             passenger_departure_time: None,
         };
-        let result = find_matches(State(state), Json(req)).await;
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
         assert!(result.is_err());
         let (status, msg) = result.unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert!(msg.contains("lat"));
+    }
+
+    // =====================================================================
+    // NEW TESTS — P1.x bug regression coverage
+    // =====================================================================
+
+    #[tokio::test]
+    async fn create_route_rejects_invalid_departure_time() {
+        let state = test_state();
+        let body = CreateRouteRequest {
+            driver_id: None,
+            origin_lat: None,
+            origin_lng: None,
+            dest_lat: None,
+            dest_lng: None,
+            origin_address: "a".into(),
+            dest_address: "b".into(),
+            departure_time: "not-a-time".into(),
+            seats_available: 2,
+        };
+        let result = create_route(State(state), Json(serde_json::to_value(&body).unwrap())).await;
+        assert!(result.is_err());
+        let (status, msg) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(msg.contains("departure_time"));
+    }
+
+    #[tokio::test]
+    async fn create_route_accepts_iso8601_departure_time() {
+        let state = test_state();
+        let body = CreateRouteRequest {
+            driver_id: None,
+            origin_lat: None,
+            origin_lng: None,
+            dest_lat: None,
+            dest_lng: None,
+            origin_address: "a".into(),
+            dest_address: "b".into(),
+            departure_time: "2026-06-17T08:00:00Z".into(),
+            seats_available: 2,
+        };
+        let result = create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap())).await;
+        assert!(result.is_ok());
+        assert_eq!(state.routes.read().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_route_rejects_out_of_range_coordinates() {
+        let state = test_state();
+        let body = CreateRouteRequest {
+            driver_id: None,
+            origin_lat: Some(999.0),
+            origin_lng: Some(-99.0),
+            dest_lat: Some(19.0),
+            dest_lng: Some(-99.0),
+            origin_address: "a".into(),
+            dest_address: "b".into(),
+            departure_time: "08:00".into(),
+            seats_available: 2,
+        };
+        let result = create_route(State(state), Json(serde_json::to_value(&body).unwrap())).await;
+        assert!(result.is_err());
+        let (status, msg) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(msg.contains("origin_lat"));
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_negative_radius() {
+        let state = test_state();
+        let req = MatchRequest {
+            lat: 19.4326,
+            lng: -99.1332,
+            radius_km: Some(-5.0),
+            passenger_bearing_deg: None,
+            time_window_minutes: None,
+            passenger_departure_time: None,
+        };
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
+        assert!(result.is_err());
+        let (status, msg) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(msg.contains("radius_km"));
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_zero_radius() {
+        let state = test_state();
+        let req = MatchRequest {
+            lat: 19.4326,
+            lng: -99.1332,
+            radius_km: Some(0.0),
+            passenger_bearing_deg: None,
+            time_window_minutes: None,
+            passenger_departure_time: None,
+        };
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_huge_radius() {
+        let state = test_state();
+        let req = MatchRequest {
+            lat: 19.4326,
+            lng: -99.1332,
+            radius_km: Some(1000.0),
+            passenger_bearing_deg: None,
+            time_window_minutes: None,
+            passenger_departure_time: None,
+        };
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn create_route_rejects_array_body() {
+        // BUG #5: POST /routes with [1,2,3] should be 422, not 201
+        let state = test_state();
+        let array_json = serde_json::json!([1, 2, 3]);
+        let result = create_route(State(state), Json(array_json)).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_array_body() {
+        // BUG #5: POST /match with [1,2,3] should be 422, not 200 with []
+        let state = test_state();
+        let array_json = serde_json::json!([1, 2, 3]);
+        let result = find_matches(State(state), Json(array_json)).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn request_ride_rejects_array_body() {
+        let state = test_state();
+        let array_json = serde_json::json!([1, 2, 3]);
+        let result = request_ride(
+            State(state),
+            Path("any-route".into()),
+            Json(array_json),
+        )
+        .await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn validate_departure_time_accepts_hh_mm() {
+        assert!(validate_departure_time("08:00").is_ok());
+        assert!(validate_departure_time("23:59").is_ok());
+        assert!(validate_departure_time("00:00").is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_departure_time_accepts_hh_mm_ss() {
+        assert!(validate_departure_time("08:00:00").is_ok());
+        assert!(validate_departure_time("23:59:59").is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_departure_time_accepts_iso8601() {
+        assert!(validate_departure_time("2026-06-17T08:00:00Z").is_ok());
+        assert!(validate_departure_time("2026-06-17T08:00:00+00:00").is_ok());
+        assert!(validate_departure_time("2026-06-17 08:00:00").is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_departure_time_rejects_garbage() {
+        assert!(validate_departure_time("not-a-time").is_err());
+        assert!(validate_departure_time("banana").is_err());
+        assert!(validate_departure_time("").is_err());
+        assert!(validate_departure_time("25:99").is_err());
+        assert!(validate_departure_time("999-99-99").is_err());
+    }
+
+    // =====================================================================
+    // P4 — Demo reset endpoint tests
+    // =====================================================================
+
+    #[tokio::test]
+    async fn demo_reset_clears_state_and_reseeds() {
+        let state = test_state();
+        // Initially empty (test_state starts with vec![])
+        assert_eq!(state.routes.read().await.len(), 0);
+
+        // Add some garbage routes
+        let body = CreateRouteRequest {
+            driver_id: None,
+            origin_lat: Some(19.4326),
+            origin_lng: Some(-99.1332),
+            dest_lat: Some(19.4512),
+            dest_lng: Some(-99.1100),
+            origin_address: "spam1".into(),
+            dest_address: "spam2".into(),
+            departure_time: "08:00".into(),
+            seats_available: 2,
+        };
+        create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(state.routes.read().await.len(), 1);
+
+        // Reset
+        let Json(resp) = demo_reset(State(state.clone())).await.expect("should succeed");
+        assert_eq!(resp["status"], "ok");
+        assert_eq!(resp["ride_requests_count"], 0);
+
+        // After reset, should have the seed routes (6 from init_sample_routes)
+        let routes_after = state.routes.read().await.len();
+        assert!(routes_after >= 6, "expected at least 6 seed routes, got {routes_after}");
+    }
+
+    #[tokio::test]
+    async fn demo_reset_clears_relevance_scores() {
+        let state = test_state();
+        // Record some scores
+        state.record_relevance_scores(&[0.8, 0.9, 0.7]).await;
+        assert_eq!(state.recent_relevance_scores.read().await.len(), 3);
+
+        // Reset
+        let _ = demo_reset(State(state.clone())).await.unwrap();
+
+        // Scores should be cleared
+        assert_eq!(state.recent_relevance_scores.read().await.len(), 0);
+        assert_eq!(state.avg_relevance_score().await, None);
     }
 }

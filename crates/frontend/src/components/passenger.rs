@@ -51,6 +51,16 @@ pub fn PassengerPage() -> Element {
                 }
             }
 
+            // Demo transparency banner
+            div { class: "demo-banner",
+                span { class: "demo-banner-icon", "ℹ️" }
+                div {
+                    strong { "Demo sin autenticación. " }
+                    "Cualquier dato que ingreses es público y modificable por otros visitantes. \
+                    Esta demo demuestra el motor de matching funcionando, no es un producto con usuarios reales."
+                }
+            }
+
             // Tab navigation
             div { class: "tabs",
                 button {
