@@ -137,18 +137,18 @@ pub fn DriverPage() -> Element {
                             "dest_lng": -99.1100,
                         });
 
-                        match api::post_json::<pickando_shared::models::WsMessage, _>(
+                        match api::post_json::<pickando_shared::models::Route, _>(
                             "/api/v1/routes",
                             &body,
                         )
                         .await
                         {
-                            Ok(_resp) => {
+                            Ok(_route) => {
                                 published.set(true);
-                                success_msg.set(
-                                    "Ruta publicada exitosamente. Visible para pasajeros cercanos."
-                                        .into(),
-                                );
+                                success_msg.set(format!(
+                                    "Ruta {} publicada exitosamente. Visible para pasajeros cercanos.",
+                                    _route.id
+                                ));
                                 // Refresh routes list
                                 if let Ok(data) =
                                     api::fetch_json::<Vec<Route>>("/api/v1/routes").await

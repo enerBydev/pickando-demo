@@ -213,6 +213,7 @@ pub struct MatchResult {
 
 /// Request body for the matching endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MatchRequest {
     pub lat: f64,
     pub lng: f64,
@@ -252,6 +253,7 @@ impl MatchRequest {
 /// All coordinate fields are optional — if the client doesn't send them,
 /// the backend uses sensible defaults (CDMX center) so the demo always works.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateRouteRequest {
     pub driver_id: Option<String>,
     pub origin_lat: Option<f64>,
@@ -304,6 +306,7 @@ impl RideRequestStatus {
 
 /// Body for `POST /api/v1/routes/{id}/request`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateRideRequest {
     pub passenger_id: Option<String>,
     pub passenger_name: String,

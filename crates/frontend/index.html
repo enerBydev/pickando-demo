@@ -213,7 +213,8 @@
         }
     </style>
     <link rel="stylesheet" href="/assets/main.css">
-    <link rel="preload" as="script" href="/./assets/pickando-frontend-dxh768cde497d9597ed.js" crossorigin>
+    <!-- Dioxus CLI inserts the WASM bundle <script> tag here during `dx build` -->
+    <!-- Do NOT hardcode script tags here — Dioxus manages them automatically -->
 </head>
 <body>
     <!-- Loading screen — Dioxus mounts the app into #main, which our watchdog detects -->
@@ -371,6 +372,5 @@
             }, 30000);
         })();
     </script>
-    <script type="module" async src="/./assets/pickando-frontend-dxh768cde497d9597ed.js"></script>
 </body>
 </html>
