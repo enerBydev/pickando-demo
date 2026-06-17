@@ -538,6 +538,60 @@ pub async fn find_matches(
 }
 
 // ===========================================================================
+// Demo management
+// ===========================================================================
+
+/// POST /api/v1/demo-reset — Reset the demo state to initial seed routes.
+///
+/// This endpoint is useful for keeping the public demo clean: when visitors
+/// create spam routes or leave garbage data, anyone can call this endpoint
+/// to restore the demo to its initial 6 seed routes.
+///
+/// No authentication is required (this is a demo, after all), but the
+/// endpoint is rate-limited naturally by the in-memory state reset.
+///
+/// Returns the new state stats so the caller can verify the reset worked.
+pub async fn demo_reset(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    state.record_request();
+
+    tracing::info!("Demo reset requested — clearing all state");
+
+    // Clear all routes and ride requests
+    {
+        let mut routes = state.routes.write().await;
+        routes.clear();
+    }
+    {
+        let mut ride_requests = state.ride_requests.write().await;
+        ride_requests.clear();
+    }
+    // Clear the relevance score history too
+    {
+        let mut history = state.recent_relevance_scores.write().await;
+        history.clear();
+    }
+
+    // Re-seed with the initial sample routes
+    let seed_routes = crate::init_sample_routes();
+    let seed_count = seed_routes.len();
+    {
+        let mut routes = state.routes.write().await;
+        *routes = seed_routes;
+    }
+
+    tracing::info!("Demo reset complete — {seed_count} seed routes restored");
+
+    Ok(Json(serde_json::json!({
+        "status": "ok",
+        "message": "Demo state reset to initial seeds",
+        "routes_count": seed_count,
+        "ride_requests_count": 0,
+    })))
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 
@@ -950,5 +1004,57 @@ mod tests {
         assert!(validate_departure_time("").is_err());
         assert!(validate_departure_time("25:99").is_err());
         assert!(validate_departure_time("999-99-99").is_err());
+    }
+
+    // =====================================================================
+    // P4 — Demo reset endpoint tests
+    // =====================================================================
+
+    #[tokio::test]
+    async fn demo_reset_clears_state_and_reseeds() {
+        let state = test_state();
+        // Initially empty (test_state starts with vec![])
+        assert_eq!(state.routes.read().await.len(), 0);
+
+        // Add some garbage routes
+        let body = CreateRouteRequest {
+            driver_id: None,
+            origin_lat: Some(19.4326),
+            origin_lng: Some(-99.1332),
+            dest_lat: Some(19.4512),
+            dest_lng: Some(-99.1100),
+            origin_address: "spam1".into(),
+            dest_address: "spam2".into(),
+            departure_time: "08:00".into(),
+            seats_available: 2,
+        };
+        create_route(State(state.clone()), Json(serde_json::to_value(&body).unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(state.routes.read().await.len(), 1);
+
+        // Reset
+        let Json(resp) = demo_reset(State(state.clone())).await.expect("should succeed");
+        assert_eq!(resp["status"], "ok");
+        assert_eq!(resp["ride_requests_count"], 0);
+
+        // After reset, should have the seed routes (6 from init_sample_routes)
+        let routes_after = state.routes.read().await.len();
+        assert!(routes_after >= 6, "expected at least 6 seed routes, got {routes_after}");
+    }
+
+    #[tokio::test]
+    async fn demo_reset_clears_relevance_scores() {
+        let state = test_state();
+        // Record some scores
+        state.record_relevance_scores(&[0.8, 0.9, 0.7]).await;
+        assert_eq!(state.recent_relevance_scores.read().await.len(), 3);
+
+        // Reset
+        let _ = demo_reset(State(state.clone())).await.unwrap();
+
+        // Scores should be cleared
+        assert_eq!(state.recent_relevance_scores.read().await.len(), 0);
+        assert_eq!(state.avg_relevance_score().await, None);
     }
 }

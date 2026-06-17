@@ -46,6 +46,7 @@ async fn main() {
         .route("/api/v1/routes/{id}", axum::routing::delete(routes::cancel_route))
         .route("/api/v1/routes/{id}/request", post(routes::request_ride))
         .route("/api/v1/match", post(routes::find_matches))
+        .route("/api/v1/demo-reset", post(routes::demo_reset))
         .route("/ws", get(ws::ws_handler))
         .with_state(state.clone());
 
@@ -122,7 +123,10 @@ async fn main() {
 
 /// Initialize sample routes with real CDMX and Monterrey coordinates.
 /// These seed the in-memory store so the demo feels alive from second one.
-fn init_sample_routes() -> Vec<Route> {
+///
+/// This function is `pub` so that `routes::demo_reset` can call it to
+/// re-seed the state when the demo-reset endpoint is invoked.
+pub fn init_sample_routes() -> Vec<Route> {
     use pickando_shared::models::RouteStatus;
 
     let now_ms = pickando_shared::models::now_ms();

@@ -37,6 +37,16 @@ pub fn DriverPage() -> Element {
                 }
             }
 
+            // Demo transparency banner
+            div { class: "demo-banner",
+                span { class: "demo-banner-icon", "ℹ️" }
+                div {
+                    strong { "Demo sin autenticación. " }
+                    "Cualquier ruta que publiques es pública y visible para otros visitantes. \
+                    Esta demo demuestra el flujo de publicación, no es un producto con usuarios reales."
+                }
+            }
+
             {if !success_msg().is_empty() {
                 rsx! {
                     div { class: "alert alert-success",
