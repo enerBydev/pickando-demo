@@ -23,7 +23,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 }
                 button {
                     class: "btn-primary btn-lg landing-cta",
-                    onclick: move |_| on_enter_platform.call(Page::Passenger),
+                    onclick: move |_| on_enter_platform.call(Page::Home),
                     "Entrar a la plataforma →"
                 }
             }
@@ -167,7 +167,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     div { class: "how-step",
                         div { class: "how-step-num", "03" }
                         h3 { "Te conectas en vivo" }
-                        p { "WebSocket bidireccional: tracking GPS, estado del viaje, mensajes. Tiempo real sin recargas." }
+                        p { "WebSocket bidireccional: broadcast de eventos en tiempo real (rutas creadas, canceladas, solicitudes de pasajeros). Sin recargas." }
                         span { class: "how-tag", "WebSocket /ws · broadcast" }
                     }
                 }
