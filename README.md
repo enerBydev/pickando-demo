@@ -97,9 +97,23 @@ Para detalles ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y los
 | DELETE  | `/api/v1/routes/{id}`             | Cancelar ruta (broadcast `route_cancelled`)   |
 | POST    | `/api/v1/routes/{id}/request`     | Solicitar unirse (broadcast `ride_request`)   |
 | POST    | `/api/v1/match`                   | Buscar matches (geohash+haversine+dir+tiempo) |
+| POST    | `/api/v1/demo-reset`              | Reiniciar demo a seeds iniciales (limpia spam)|
 | GET     | `/ws`                             | WebSocket bidireccional con broadcast         |
 
 Referencia completa: [`docs/API.md`](docs/API.md).
+
+### Seguridad
+
+- **CORS restrictivo:** en producción solo permite `pickando-demo-production.up.railway.app`.
+  En desarrollo (`PICKANDO_DEV=1`) permite localhost en cualquier puerto.
+- **Security headers:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()`.
+- **Validación de input:** todos los POST handlers rechazan bodies no-objeto (422),
+  coordenadas fuera de rango (400), `departure_time` inválido (400), `radius_km` negativo (400).
+- **`#[serde(deny_unknown_fields)]`** en `MatchRequest`, `CreateRouteRequest`, `CreateRideRequest`
+  para defense-in-depth contra deserialización de arrays como structs.
+
+Ver ADR-0007 (validación), ADR-0008 (CORS + headers), ADR-0009 (demo-reset) en `docs/adr/`.
 
 ### Ejemplos rápidos
 
@@ -220,9 +234,11 @@ La app compila a 4+ plataformas desde un solo codebase:
 | Crate              | Tests | Tipo                                |
 |--------------------|-------|-------------------------------------|
 | `pickando-shared`  | 40    | Unit + property-based (proptest)    |
-| `pickando-backend` | 10    | Integration (handler-level)         |
+| `pickando-backend` | 25    | Integration (handler-level)         |
 | Doc tests          | 1     | `haversine_km` doctest              |
-| **Total**          | **51**| all passing                         |
+| **Total**          | **66**| all passing                         |
+
+Incluye 25 tests de regresión cubriendo los 6 bugs críticos de v0.2.1 (ver CHANGELOG v0.3.0).
 
 ### Verificación local
 

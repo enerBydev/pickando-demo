@@ -346,7 +346,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 }
                 div { class: "landing-footer-info",
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.2.1 · Junio 2026" }
+                    p { class: "footer-version", "v0.3.0 · Junio 2026" }
                 }
             }
         }
