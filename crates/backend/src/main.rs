@@ -3,10 +3,13 @@ use pickando_shared::matching::encode_geohash;
 use pickando_shared::models::Route;
 use std::sync::Arc;
 use std::time::Instant;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
+mod broadcast;
 mod routes;
 mod state;
 mod ws;
@@ -19,8 +22,10 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::from_default_env().add_directive("pickando=info".parse().unwrap()),
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("pickando=info,tower_http=info")),
         )
+        .with_target(false)
         .init();
 
     let start_time = Instant::now();
@@ -34,8 +39,12 @@ async fn main() {
 
     let api_routes = Router::new()
         .route("/api/v1/health", get(routes::health_check))
+        .route("/api/v1/stats", get(routes::stats))
         .route("/api/v1/routes", get(routes::list_routes))
         .route("/api/v1/routes", post(routes::create_route))
+        .route("/api/v1/routes/{id}", get(routes::get_route))
+        .route("/api/v1/routes/{id}", axum::routing::delete(routes::cancel_route))
+        .route("/api/v1/routes/{id}/request", post(routes::request_ride))
         .route("/api/v1/match", post(routes::find_matches))
         .route("/ws", get(ws::ws_handler))
         .with_state(state.clone());
@@ -43,12 +52,23 @@ async fn main() {
     let app = Router::new()
         .merge(api_routes)
         .fallback_service(ServeDir::new("static").append_index_html_on_directories(true))
+        .layer(CompressionLayer::new())
+        .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
+            let req_id = uuid::Uuid::new_v4().simple();
+            tracing::info_span!(
+                "http",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %req_id,
+            )
+        }))
         .layer(CorsLayer::permissive());
 
     let addr = format!("0.0.0.0:{port}");
-    tracing::info!("Pickando Backend starting on http://{addr}");
+    tracing::info!("Pickando Backend v{} starting on http://{addr}", env!("CARGO_PKG_VERSION"));
     tracing::info!("Health check: http://{addr}/api/v1/health");
-    tracing::info!("WebSocket: ws://{addr}/ws");
+    tracing::info!("Stats:        http://{addr}/api/v1/stats");
+    tracing::info!("WebSocket:    ws://{addr}/ws");
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
@@ -67,90 +87,88 @@ async fn main() {
 fn init_sample_routes() -> Vec<Route> {
     use pickando_shared::models::RouteStatus;
 
-    vec![
-        Route {
-            id: "route-001".into(),
-            driver_id: "driver-001".into(),
-            origin_lat: 19.4326,
-            origin_lng: -99.1332,
-            dest_lat: 19.4512,
-            dest_lng: -99.1100,
-            origin_address: "Zócalo, CDMX".into(),
-            dest_address: "Polanco, CDMX".into(),
-            departure_time: "2026-06-17T08:00:00".into(),
-            seats_available: 3,
+    let now_ms = pickando_shared::models::now_ms();
+
+    let seeds = [
+        (
+            19.4326,
+            -99.1332,
+            19.4512,
+            -99.1100,
+            "Zócalo, CDMX",
+            "Polanco, CDMX",
+            "08:00",
+            3u32,
+        ),
+        (
+            19.4284,
+            -99.1276,
+            19.4680,
+            -99.1530,
+            "Alameda Central, CDMX",
+            "Satélite, EdoMex",
+            "09:00",
+            2,
+        ),
+        (
+            19.4420,
+            -99.1450,
+            19.4700,
+            -99.1200,
+            "Reforma, CDMX",
+            "Coyoacán, CDMX",
+            "07:30",
+            4,
+        ),
+        (
+            25.6487,
+            -100.4412,
+            25.6700,
+            -100.3100,
+            "Monterrey Centro",
+            "San Pedro Garza García",
+            "07:30",
+            1,
+        ),
+        (
+            19.3550,
+            -99.1420,
+            19.4100,
+            -99.1700,
+            "Tlalpan, CDMX",
+            "Roma Norte, CDMX",
+            "18:00",
+            2,
+        ),
+        (
+            19.4840,
+            -99.1120,
+            19.4260,
+            -99.1670,
+            "Indios Verdes, CDMX",
+            "Condesa, CDMX",
+            "17:30",
+            3,
+        ),
+    ];
+
+    seeds
+        .into_iter()
+        .enumerate()
+        .map(|(i, (o_lat, o_lng, d_lat, d_lng, o_addr, d_addr, dep, seats))| Route {
+            id: format!("route-{:03}", i + 1),
+            driver_id: format!("driver-{:03}", i + 1),
+            origin_lat: o_lat,
+            origin_lng: o_lng,
+            dest_lat: d_lat,
+            dest_lng: d_lng,
+            origin_address: o_addr.into(),
+            dest_address: d_addr.into(),
+            departure_time: dep.into(),
+            seats_available: seats,
             status: RouteStatus::Published,
-            geohash: encode_geohash(19.4326, -99.1332, 6),
-        },
-        Route {
-            id: "route-002".into(),
-            driver_id: "driver-002".into(),
-            origin_lat: 19.4284,
-            origin_lng: -99.1276,
-            dest_lat: 19.4680,
-            dest_lng: -99.1530,
-            origin_address: "Alameda Central, CDMX".into(),
-            dest_address: "Satélite, EdoMex".into(),
-            departure_time: "2026-06-17T09:00:00".into(),
-            seats_available: 2,
-            status: RouteStatus::Published,
-            geohash: encode_geohash(19.4284, -99.1276, 6),
-        },
-        Route {
-            id: "route-003".into(),
-            driver_id: "driver-003".into(),
-            origin_lat: 19.4420,
-            origin_lng: -99.1450,
-            dest_lat: 19.4700,
-            dest_lng: -99.1200,
-            origin_address: "Reforma, CDMX".into(),
-            dest_address: "Coyoacán, CDMX".into(),
-            departure_time: "2026-06-17T07:30:00".into(),
-            seats_available: 4,
-            status: RouteStatus::Published,
-            geohash: encode_geohash(19.4420, -99.1450, 6),
-        },
-        Route {
-            id: "route-004".into(),
-            driver_id: "driver-004".into(),
-            origin_lat: 25.6487,
-            origin_lng: -100.4412,
-            dest_lat: 25.6700,
-            dest_lng: -100.3100,
-            origin_address: "Monterrey Centro".into(),
-            dest_address: "San Pedro Garza García".into(),
-            departure_time: "2026-06-17T07:30:00".into(),
-            seats_available: 1,
-            status: RouteStatus::Published,
-            geohash: encode_geohash(25.6487, -100.4412, 6),
-        },
-        Route {
-            id: "route-005".into(),
-            driver_id: "driver-005".into(),
-            origin_lat: 19.3550,
-            origin_lng: -99.1420,
-            dest_lat: 19.4100,
-            dest_lng: -99.1700,
-            origin_address: "Tlalpan, CDMX".into(),
-            dest_address: "Roma Norte, CDMX".into(),
-            departure_time: "2026-06-17T18:00:00".into(),
-            seats_available: 2,
-            status: RouteStatus::Published,
-            geohash: encode_geohash(19.3550, -99.1420, 6),
-        },
-        Route {
-            id: "route-006".into(),
-            driver_id: "driver-006".into(),
-            origin_lat: 19.4840,
-            origin_lng: -99.1120,
-            dest_lat: 19.4260,
-            dest_lng: -99.1670,
-            origin_address: "Indios Verdes, CDMX".into(),
-            dest_address: "Condesa, CDMX".into(),
-            departure_time: "2026-06-17T17:30:00".into(),
-            seats_available: 3,
-            status: RouteStatus::Published,
-            geohash: encode_geohash(19.4840, -99.1120, 6),
-        },
-    ]
+            geohash: encode_geohash(o_lat, o_lng, 6),
+            created_at_ms: now_ms,
+        })
+        .collect()
 }

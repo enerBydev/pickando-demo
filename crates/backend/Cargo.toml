@@ -2,6 +2,11 @@
 name = "pickando-backend"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Axum backend for Pickando — REST API + WebSocket for same-direction local mobility"
+categories.workspace = true
+keywords.workspace = true
 
 [[bin]]
 name = "pickando-backend"
@@ -9,13 +14,20 @@ path = "src/main.rs"
 
 [dependencies]
 pickando-shared = { path = "../shared" }
-axum = { version = "0.8", features = ["ws"] }
+axum = { workspace = true }
 tokio = { workspace = true }
-tower-http = { version = "0.6", features = ["cors", "fs"] }
+tower = { workspace = true }
+tower-http = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = "0.15"
-tower = "0.5"
 futures-util = "0.3"
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+axum-test = "16"
+tokio = { version = "1", features = ["full", "test-util"] }
+serde_json = { workspace = true }
