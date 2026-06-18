@@ -12,7 +12,33 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         header { class: "landing-header",
             div { class: "landing-header-inner",
                 div { class: "landing-brand",
-                    span { class: "landing-brand-mark", "P" }
+                    span { class: "landing-brand-mark",
+                        svg {
+                            width: "22",
+                            height: "22",
+                            view_box: "0 0 24 24",
+                            fill: "none",
+                            xmlns: "http://www.w3.org/2000/svg",
+                            // Two routes converging to a point — the visual
+                            // metaphor for "same-direction mobility"
+                            path {
+                                d: "M3 7 L12 13 L21 7",
+                                stroke: "#FFFFFF",
+                                stroke_width: "2.2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                            }
+                            path {
+                                d: "M3 17 L12 13 L21 17",
+                                stroke: "#FFFFFF",
+                                stroke_width: "2.2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                opacity: "0.6",
+                            }
+                            circle { cx: "12", cy: "13", r: "2.4", fill: "#FFFFFF" }
+                        }
+                    }
                     span { class: "landing-brand-text", "Pickando" }
                 }
                 nav { class: "landing-nav",
@@ -99,7 +125,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     button {
                         class: "btn-secondary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Driver),
-                        "🚗 Tengo asientos libres"
+                        "🚗 Ofrecer mi ruta"
                     }
                 }
                 div { class: "hero-trust",

@@ -2253,3 +2253,203 @@ body {
         font-size: 0.85rem;
     }
 }
+
+/* ============ v0.3.1 enhancements — logo animation, score bars contrast ============ */
+
+/* Brand mark — animate the converging routes on hover */
+.landing-brand-mark,
+.brand-icon {
+    transition: transform 0.3s ease;
+}
+
+.landing-brand:hover .landing-brand-mark,
+.navbar-brand:hover .brand-icon {
+    transform: rotate(-5deg) scale(1.05);
+}
+
+/* Make score bars more visible — brighter colors, glow, larger labels */
+.match-scores {
+    background: var(--surface-1);
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin-top: 12px;
+}
+
+.score-bar {
+    margin-bottom: 10px;
+}
+
+.score-bar:last-child {
+    margin-bottom: 0;
+}
+
+.score-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.score-track {
+    height: 8px;  /* thicker for visibility */
+    background: var(--surface-3);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.score-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00FF88 0%, #00C46A 100%);
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.6);
+    position: relative;
+}
+
+.score-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    animation: score-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes score-shimmer {
+    0%, 100% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+}
+
+.score-fill.score-dir {
+    background: linear-gradient(90deg, #3B82F6 0%, #6366F1 100%);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+}
+
+.score-fill.score-time {
+    background: linear-gradient(90deg, #F59E0B 0%, #EF4444 100%);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+.score-value {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Story card — make it pop with a subtle gradient and animation */
+.landing-story .story-card {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--primary-glow);
+    box-shadow: 0 20px 60px rgba(0, 184, 148, 0.15), var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+}
+
+.landing-story .story-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #00B894 0%, #FF8A3D 50%, #00B894 100%);
+}
+
+/* Story avatars — pulse to feel alive */
+.story-avatar.driver {
+    background: linear-gradient(135deg, #00B894 0%, #00C46A 100%);
+    border-color: #00FF88;
+    animation: story-pulse 3s ease-in-out infinite;
+}
+
+.story-avatar.passenger {
+    background: linear-gradient(135deg, #FF8A3D 0%, #FFB27A 100%);
+    border-color: #FFB27A;
+    animation: story-pulse 3s ease-in-out infinite 1.5s;
+}
+
+@keyframes story-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+    50% { transform: scale(1.04); box-shadow: 0 0 0 12px rgba(0, 255, 136, 0); }
+}
+
+/* Story connector — animated arrow */
+.story-connector {
+    font-size: 1.8rem;
+    color: var(--primary);
+    animation: connector-bounce 2s ease-in-out infinite;
+}
+
+@keyframes connector-bounce {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(6px); }
+}
+
+/* Hero CTAs — better hover state */
+.hero-actions .btn-primary,
+.hero-actions .btn-secondary {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-actions .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 184, 148, 0.4);
+}
+
+.hero-actions .btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(255, 138, 61, 0.3);
+}
+
+/* Match cards — subtle hover lift */
+.match-card {
+    transition: all 0.2s ease;
+}
+
+.match-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+    border-color: var(--primary);
+}
+
+/* Demo banner — make it less intrusive but still visible */
+.demo-banner {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Empty state — friendlier */
+.empty-state {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    background: var(--surface-1);
+    border-radius: 10px;
+    border: 1px dashed var(--border);
+}
+
+/* Mobile tweaks */
+@media (max-width: 640px) {
+    .match-scores {
+        padding: 10px;
+    }
+    .score-bar {
+        grid-template-columns: 60px 1fr 32px;
+        gap: 8px;
+    }
+    .score-label {
+        font-size: 0.7rem;
+    }
+    .story-actors {
+        gap: var(--space-4);
+    }
+    .story-actor {
+        min-width: 140px;
+    }
+}

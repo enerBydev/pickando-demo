@@ -25,7 +25,31 @@ pub fn Navbar(
                 div {
                     class: "navbar-brand",
                     onclick: move |_| on_home.call(()),
-                    span { class: "brand-icon", "P" }
+                    span { class: "brand-icon",
+                        svg {
+                            width: "18",
+                            height: "18",
+                            view_box: "0 0 24 24",
+                            fill: "none",
+                            xmlns: "http://www.w3.org/2000/svg",
+                            path {
+                                d: "M3 7 L12 13 L21 7",
+                                stroke: "#FFFFFF",
+                                stroke_width: "2.4",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                            }
+                            path {
+                                d: "M3 17 L12 13 L21 17",
+                                stroke: "#FFFFFF",
+                                stroke_width: "2.4",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                opacity: "0.6",
+                            }
+                            circle { cx: "12", cy: "13", r: "2.4", fill: "#FFFFFF" }
+                        }
+                    }
                     span { class: "brand-text", "Pickando" }
                 }
 
