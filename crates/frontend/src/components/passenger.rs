@@ -250,22 +250,27 @@ pub fn PassengerPage() -> Element {
                                     // Auto-scroll to results so the user sees them
                                     // (the form is long and results appear below it).
                                     if count > 0 {
-                                        // Use setTimeout(50ms) to give Dioxus one tick
-                                        // to render the new nodes before we scroll.
-                                        // This is the simplest cross-platform way to
-                                        // yield to the renderer in WASM.
+                                        // Use setTimeout(80ms) to give Dioxus time to
+                                        // render the new nodes before we scroll.
+                                        // We scroll to the "Matches Encontrados" h3
+                                        // heading rather than the .results-section div
+                                        // because the latter includes the form, which is
+                                        // already in view.
                                         if let Some(win) = web_sys::window() {
                                             let win_clone = win.clone();
                                             let cb = wasm_bindgen::closure::Closure::<dyn FnMut()>::new(move || {
                                                 if let Some(doc) = win_clone.document() {
-                                                    if let Some(el) = doc.query_selector(".results-section").ok().flatten() {
+                                                    // Try .match-card first (the actual results),
+                                                    // then .match-header h3, then .results-section
+                                                    let selector = ".match-card, .results-section h3, .results-section";
+                                                    if let Some(el) = doc.query_selector(selector).ok().flatten() {
                                                         el.scroll_into_view_with_bool(true);
                                                     }
                                                 }
                                             });
                                             let _ = win.set_timeout_with_callback_and_timeout_and_arguments(
                                                 cb.as_ref().unchecked_ref(),
-                                                50,
+                                                80,
                                                 &js_sys::Array::new(),
                                             );
                                             cb.forget();
