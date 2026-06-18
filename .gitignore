@@ -29,3 +29,4 @@ dist/
 *.log
 *.tmp
 static/
+state.json
