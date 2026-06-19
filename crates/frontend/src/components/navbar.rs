@@ -70,7 +70,7 @@ pub fn Navbar(
                 button {
                     class: "mobile-toggle",
                     onclick: move |_| mobile_open.toggle(),
-                    if mobile_open() { "✕" } else { "☰" }
+                    if mobile_open() { "×" } else { "Menu" }
                 }
             }
 

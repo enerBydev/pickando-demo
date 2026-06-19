@@ -39,7 +39,7 @@ pub fn DriverPage() -> Element {
 
             // Demo transparency banner
             div { class: "demo-banner",
-                span { class: "demo-banner-icon", "ℹ️" }
+                span { class: "demo-banner-icon", "i" }
                 div {
                     strong { "Demo sin autenticación. " }
                     "Cualquier ruta que publiques es pública y visible para otros visitantes. \
@@ -55,7 +55,7 @@ pub fn DriverPage() -> Element {
                         button {
                             class: "alert-close",
                             onclick: move |_| success_msg.set(String::new()),
-                            "✕"
+                            "×"
                         }
                     }
                 }
@@ -71,7 +71,7 @@ pub fn DriverPage() -> Element {
                         button {
                             class: "alert-close",
                             onclick: move |_| error_msg.set(String::new()),
-                            "✕"
+                            "×"
                         }
                     }
                 }

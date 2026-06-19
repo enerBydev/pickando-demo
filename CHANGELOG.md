@@ -5,6 +5,71 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-06-19
+
+### Summary
+Major visual rebranding + critical scroll bug fix.
+This release introduces the "Sendero Compartido" (warm trust editorial) design direction,
+fixes a critical layout bug that broke scrolling on the landing page, and removes
+all AI-slop visual patterns (emoji icons, indigo/purple gradients, glassmorphism).
+
+### Fixed — Critical
+- **Landing page scroll broken**: `.landing-hero` had `min-height: 100vh` combined with
+  `overflow: hidden` and massive absolutely-positioned SVGs with `inset: 0` + `height: 100%`.
+  This caused the browser to clip rendering and break vertical scrolling on the landing page
+  (only the first ~200px would render, then the next section, with broken flow in between).
+  Fix: removed `min-height: 100vh` from hero (let content define height), changed
+  `overflow: hidden` to `overflow: visible` on the hero, contained decorative SVGs inside
+  their own overflow-hidden wrapper, and wrapped `View::Landing` in `app-container` so the
+  body flex layout flows correctly (previously only `View::Platform` was wrapped).
+- `body` now uses `display: flex; flex-direction: column; overflow-x: hidden` so vertical
+  scroll works on every page without horizontal scrollbar jumps.
+
+### Changed — Visual rebranding ("Sendero Compartido")
+- **Palette**: shifted from dark theme (emerald + amber on `#0F1419`) to warm editorial
+  light theme: cream paper `#FAF6F0` background, deep forest green `#1F4D3A` primary,
+  warm terracotta `#C66B3D` accent, warm carbón `#2A2520` text. This aligns with the
+  client's psychological profile (trust + warmth + humanity, not "hacker terminal").
+- **Typography**: added Fraunces (humanist serif) for display headlines alongside Inter
+  for body and JetBrains Mono for data. `font-variation-settings: "opsz" 144` for
+  optical sizing on headlines.
+- **Buttons**: removed gradient backgrounds + glow shadows, replaced with solid
+  `--primary` fill + clean shadow. Secondary buttons use bordered surface style.
+- **Cards**: removed gradient backgrounds on hover, replaced with subtle border color
+  change + standard shadow elevation.
+- **Hero**: removed the massive `600px x 600px` blurred orbs that overflowed, replaced
+  with `480px` contained orbs + opacity 0.4 (still decorative but no longer breaks layout).
+- **Story section**: removed gradient border + colored avatar backgrounds, replaced with
+  tinted backgrounds + serif initials (M / A) instead of emoji.
+
+### Removed — Anti-AI-slop cleanup
+- All emoji icons removed from buttons, cards, and feature grids
+  (🔍 🚗 🧭 ⚡ 🖥️ 📊 🔌 🎨 ℹ️ ⚠️ ☰ → replaced with text or numbered indices "01", "02" ... "06").
+- Removed `linear-gradient(135deg, indigo, purple)` patterns from score bars.
+- Removed `glassmorphism` (backdrop-filter blur + saturated + translucent) — kept only
+  on navbar/header for sticky readability, with reduced opacity.
+- Removed neon glow shadows (`box-shadow: 0 0 12px rgba(0,255,136,0.6)`).
+- Removed `score-shimmer` animation (was AI-slop pattern).
+- Removed `story-pulse` infinite pulsing animation (was visual noise).
+- Removed `connector-bounce` animation (was visual noise).
+
+### Added — Accessibility & UX
+- `prefers-reduced-motion` media query: disables all animations and transitions.
+- `*:focus-visible` outline for keyboard navigation (2px primary outline).
+- `scroll-padding-top: 80px` on html for anchor links offset by sticky header.
+- `scrollbar-width: thin` + `scrollbar-color` for Firefox.
+- Better mobile responsive breakpoints (968px, 768px, 640px, 480px) with
+  properly scaled typography via `clamp()`.
+- Theme-color meta updated to `#FAF6F0` (was `#0D0D11`).
+
+### Files changed
+- `crates/frontend/assets/main.css` — full rewrite (~1470 lines changed)
+- `crates/frontend/src/main.rs` — wrap View::Landing in app-container, update theme-color
+- `crates/frontend/src/components/landing.rs` — remove emojis, use numbered indices
+- `crates/frontend/src/components/driver.rs` — remove emojis from demo banner
+- `crates/frontend/src/components/passenger.rs` — remove emojis from tabs/buttons
+- `crates/frontend/src/components/navbar.rs` — replace ☰ emoji with "Menu" text
+
 ## [0.3.0] — 2026-06-17
 
 ### Summary

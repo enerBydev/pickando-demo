@@ -120,22 +120,22 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     button {
                         class: "btn-primary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "🔍 Buscar viaje cerca de ti"
+                        "Buscar viaje cerca de ti"
                     }
                     button {
                         class: "btn-secondary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Driver),
-                        "🚗 Ofrecer mi ruta"
+                        "Ofrecer mi ruta"
                     }
                 }
                 div { class: "hero-trust",
-                    span { "✓ Sin registro" }
+                    span { "Sin registro" }
                     span { class: "hero-trust-dot" }
-                    span { "✓ Sin costo" }
+                    span { "Sin costo" }
                     span { class: "hero-trust-dot" }
-                    span { "💰 Ahorra hasta 70% vs Uber" }
+                    span { "Ahorra hasta 70% vs Uber" }
                     span { class: "hero-trust-dot" }
-                    span { "🌍 Reduce tu huella de CO₂" }
+                    span { "Reduce tu huella de CO₂" }
                 }
             }
         }
@@ -218,39 +218,39 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 }
                 div { class: "features",
                     div { class: "feature-card",
-                        div { class: "feature-icon", "🧭" }
+                        div { class: "feature-icon", "01" }
                         h3 { "Matching inteligente" }
                         p { "Geohash + Haversine + similitud de dirección + ventana temporal. Encuentra conductores que van en tu misma dirección, no solo cerca." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
-                        div { class: "feature-icon", "⚡" }
+                        div { class: "feature-icon", "02" }
                         h3 { "Tiempo real" }
                         p { "WebSocket bidireccional con broadcast. Cualquier cliente conectado ve route_created, route_cancelled y ride_request al instante." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
-                        div { class: "feature-icon", "🖥️" }
+                        div { class: "feature-icon", "03" }
                         h3 { "Multi-plataforma" }
                         p { "Un solo codebase → Web (WASM), Linux, Windows, Android. Rust compila a todo. Sin Dart, sin JavaScript, sin Electron." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
-                        div { class: "feature-icon", "📊" }
+                        div { class: "feature-icon", "04" }
                         h3 { "Telemetría en vivo" }
                         p { "GET /api/v1/stats: rutas por estado, solicitudes, uptime, requests servidos, uso de memoria. Todo en tiempo real." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
-                        div { class: "feature-icon", "🔌" }
+                        div { class: "feature-icon", "05" }
                         h3 { "API REST completa" }
                         p { "8 endpoints documentados + WebSocket. CORS, gzip, tracing con UUID por request, error handling tipado." }
                         span { class: "feature-tag", "Funcional" }
                     }
                     div { class: "feature-card",
-                        div { class: "feature-icon", "🎨" }
+                        div { class: "feature-icon", "06" }
                         h3 { "Diseño con alma" }
-                        p { "Dark theme premium, paleta cálida (emerald + amber), microinteracciones, animaciones, responsive mobile-first." }
+                        p { "Editorial warm, paleta cálida (forest green + terracotta), microinteracciones, animaciones, responsive mobile-first." }
                         span { class: "feature-tag", "Funcional" }
                     }
                 }
@@ -309,14 +309,14 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 div { class: "story-card",
                     div { class: "story-actors",
                         div { class: "story-actor",
-                            div { class: "story-avatar driver", "🚗" }
+                            div { class: "story-avatar driver", "M" }
                             div { class: "story-actor-name", "María" }
                             div { class: "story-actor-role", "Conductora" }
                             div { class: "story-actor-route", "Polanco → Centro, 8:00 AM" }
                         }
                         div { class: "story-connector", "→" }
                         div { class: "story-actor",
-                            div { class: "story-avatar passenger", "👤" }
+                            div { class: "story-avatar passenger", "A" }
                             div { class: "story-actor-name", "Antonio" }
                             div { class: "story-actor-role", "Pasajero" }
                             div { class: "story-actor-route", "Anzures → Zócalo, 8:15 AM" }
@@ -343,7 +343,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     button {
                         class: "btn-primary btn-lg",
                         onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "🔍 Buscar viaje cerca de ti"
+                        "Buscar viaje cerca de ti"
                     }
                     button {
                         class: "btn-secondary btn-lg",
@@ -372,7 +372,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 }
                 div { class: "landing-footer-info",
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.3.0 · Junio 2026" }
+                    p { class: "footer-version", "v0.4.0 · Junio 2026 · Sendero Compartido" }
                 }
             }
         }
@@ -396,7 +396,7 @@ pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
                 div {
                     class: "platform-card",
                     onclick: move |_| on_navigate.call(Page::Passenger),
-                    div { class: "platform-card-icon", "🧭" }
+                    div { class: "platform-card-icon", "01" }
                     h3 { "Buscar viaje" }
                     p { "Encuentra conductores que van en tu misma dirección. Matching con geohash + haversine + dirección + tiempo." }
                     span { class: "platform-card-arrow", "→" }
@@ -404,7 +404,7 @@ pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
                 div {
                     class: "platform-card",
                     onclick: move |_| on_navigate.call(Page::Driver),
-                    div { class: "platform-card-icon", "🚗" }
+                    div { class: "platform-card-icon", "02" }
                     h3 { "Publicar ruta" }
                     p { "Publica tu ruta como conductor. Recibe pasajeros que van en tu misma dirección en tiempo real." }
                     span { class: "platform-card-arrow", "→" }
@@ -412,7 +412,7 @@ pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
                 div {
                     class: "platform-card",
                     onclick: move |_| on_navigate.call(Page::About),
-                    div { class: "platform-card-icon", "ℹ️" }
+                    div { class: "platform-card-icon", "03" }
                     h3 { "Acerca de la demo" }
                     p { "Qué es real, qué es placeholder, qué es reutilizable. Tabla detallada + 8 endpoints documentados." }
                     span { class: "platform-card-arrow", "→" }

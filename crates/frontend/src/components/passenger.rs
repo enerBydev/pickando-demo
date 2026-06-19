@@ -53,7 +53,7 @@ pub fn PassengerPage() -> Element {
 
             // Demo transparency banner
             div { class: "demo-banner",
-                span { class: "demo-banner-icon", "ℹ️" }
+                span { class: "demo-banner-icon", "i" }
                 div {
                     strong { "Demo sin autenticación. " }
                     "Cualquier dato que ingreses es público y modificable por otros visitantes. \
@@ -66,7 +66,7 @@ pub fn PassengerPage() -> Element {
                 button {
                     class: if active_tab() == 0 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(0),
-                    "🔍 Matching"
+                    "Matching"
                 }
                 button {
                     class: if active_tab() == 1 { "tab active" } else { "tab" },
@@ -81,7 +81,7 @@ pub fn PassengerPage() -> Element {
                 button {
                     class: if active_tab() == 3 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(3),
-                    "📊 Stats"
+                    "Stats"
                 }
             }
 
@@ -89,7 +89,7 @@ pub fn PassengerPage() -> Element {
                 rsx! { div { class: "alert alert-info",
                     span { class: "alert-icon", "i" }
                     "{status_msg()}"
-                    button { class: "alert-close", onclick: move |_| status_msg.set(String::new()), "✕" }
+                    button { class: "alert-close", onclick: move |_| status_msg.set(String::new()), "×" }
                 }}
             } else { rsx! {} }}
 
@@ -97,7 +97,7 @@ pub fn PassengerPage() -> Element {
                 rsx! { div { class: "alert alert-error",
                     span { class: "alert-icon", "!" }
                     "{error_msg()}"
-                    button { class: "alert-close", onclick: move |_| error_msg.set(String::new()), "✕" }
+                    button { class: "alert-close", onclick: move |_| error_msg.set(String::new()), "×" }
                 }}
             } else { rsx! {} }}
 
@@ -281,7 +281,7 @@ pub fn PassengerPage() -> Element {
                             }
                             loading.set(false);
                         },
-                        if loading() { "Buscando..." } else { "🔍 Buscar Matches" }
+                        if loading() { "Buscando..." } else { "Buscar Matches" }
                     }
 
                     if last_query_ms() > 0 {
@@ -546,7 +546,7 @@ fn WebSocketDemo() -> Element {
                 wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::new(move |_e| {
                     messages_handle4
                         .write()
-                        .push("⚠️ Error en la conexión WebSocket".into());
+                        .push("Error en la conexión WebSocket".into());
                 });
             ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
             onerror.forget();
@@ -678,7 +678,7 @@ fn StatsPanel() -> Element {
                     }
                     loading.set(false);
                 },
-                if loading() { "Cargando..." } else { "📊 Cargar métricas" }
+                if loading() { "Cargando..." } else { "Cargar métricas" }
             }
 
             {if !error().is_empty() {

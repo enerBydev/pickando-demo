@@ -23,7 +23,7 @@ pub fn Footer() -> Element {
 
                 div { class: "footer-info",
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.1.0 — Junio 2026" }
+                    p { class: "footer-version", "v0.4.0 — Junio 2026 — Sendero Compartido" }
                 }
             }
         }

@@ -42,16 +42,18 @@ fn App() -> Element {
         }
         document::Meta { name: "description", content: "Pickando — Same-direction local mobility platform built in Rust" }
         document::Meta { name: "viewport", content: "width=device-width, initial-scale=1.0" }
-        document::Meta { name: "theme-color", content: "#0D0D11" }
+        document::Meta { name: "theme-color", content: "#FAF6F0" }
 
-        match view() {
-            View::Landing => rsx! {
-                LandingPage {
-                    on_enter_platform: move |page: Page| view.set(View::Platform(page)),
-                }
-            },
-            View::Platform(page) => rsx! {
-                div { class: "app-container",
+        // Both Landing and Platform are wrapped in app-container so the body
+        // flex layout flows correctly and scroll works on all pages.
+        div { class: "app-container",
+            match view() {
+                View::Landing => rsx! {
+                    LandingPage {
+                        on_enter_platform: move |page: Page| view.set(View::Platform(page)),
+                    }
+                },
+                View::Platform(page) => rsx! {
                     Navbar {
                         active_page: page,
                         on_navigate: move |p: Page| view.set(View::Platform(p)),
@@ -68,8 +70,8 @@ fn App() -> Element {
                     }
 
                     Footer {}
-                }
-            },
+                },
+            }
         }
     }
 }
