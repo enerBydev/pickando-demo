@@ -1,13 +1,14 @@
+//! Platform footer — only shown inside `/app/*`.
+
 use dioxus::prelude::*;
 
-/// Platform footer — shown inside the platform shell (not on landing).
 #[component]
 pub fn Footer() -> Element {
     rsx! {
         footer { class: "footer",
             div { class: "footer-inner",
                 div { class: "footer-brand",
-                    span { class: "footer-logo", "Pickando" }
+                    span { class: "footer-logo", "Nitheky" }
                     span { class: "footer-tagline", "Same-direction local mobility · Demo" }
                 }
 
@@ -22,8 +23,9 @@ pub fn Footer() -> Element {
                 }
 
                 div { class: "footer-info",
+                    h4 { "Demo" }
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.4.0 — Junio 2026 — Sendero Compartido" }
+                    p { class: "footer-version", "v0.5.0 — Junio 2026 — Mono Elegance + DE-Gold" }
                 }
             }
         }

@@ -1,12 +1,12 @@
 [application]
-name = "Pickando"
+name = "Nitheky"
 default_platform = "web"
 
 # Asset directory for static files
 asset_dir = "assets"
 
 [web.app]
-title = "Pickando — Same-Direction Local Mobility"
+title = "Nitheky — Same-Direction Local Mobility"
 base_path = "/"
 
 [web.watcher]
@@ -18,6 +18,6 @@ style = ["/assets/main.css"]
 [web.resource.dev]
 
 [bundle]
-identifier = "com.pickando.demo"
-publisher = "Pickando"
+identifier = "com.nitheky.demo"
+publisher = "Nitheky"
 icon = ["assets/icon.png"]

@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nitheky Android theme — matches the new Mono Elegance + DE-Gold brand.
+    Palette: Ink #0A0A0A primary, DE-Gold #C9A961 accent.
+-->
 <resources>
     <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
-        <item name="android:colorPrimary">#00FF88</item>
-        <item name="android:colorPrimaryDark">#00C46A</item>
-        <item name="android:colorAccent">#FF8A3D</item>
-        <item name="android:windowBackground">#0D0D11</item>
-        <item name="android:statusBarColor">#0D0D11</item>
-        <item name="android:navigationBarColor">#0D0D11</item>
+        <item name="android:colorPrimary">#0A0A0A</item>
+        <item name="android:colorPrimaryDark">#000000</item>
+        <item name="android:colorAccent">#C9A961</item>
+        <item name="android:windowBackground">#FAFAFA</item>
+        <item name="android:statusBarColor">#0A0A0A</item>
+        <item name="android:navigationBarColor">#0A0A0A</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

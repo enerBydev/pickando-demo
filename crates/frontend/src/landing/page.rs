@@ -1,45 +1,47 @@
+//! Landing page — public marketing site at `/`.
+//!
+//! Replaces the old `LandingPage` component. Uses Dioxus Router `Link`
+//! instead of event handlers, so navigation is real URL-based.
+
 use dioxus::prelude::*;
 
-use crate::Page;
+use crate::Route;
 
-/// Public marketing landing page — shown to first-time visitors.
-/// This page is intentionally distinct from the platform shell:
-/// it has its own header, hero, and CTA to "enter the platform".
+/// Public marketing landing page — shown to first-time visitors at `/`.
 #[component]
-pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
+pub fn LandingPage() -> Element {
     rsx! {
         // ===== Landing header (separate from platform navbar) =====
         header { class: "landing-header",
             div { class: "landing-header-inner",
-                div { class: "landing-brand",
-                    span { class: "landing-brand-mark",
-                        svg {
-                            width: "22",
-                            height: "22",
-                            view_box: "0 0 24 24",
-                            fill: "none",
-                            xmlns: "http://www.w3.org/2000/svg",
-                            // Two routes converging to a point — the visual
-                            // metaphor for "same-direction mobility"
-                            path {
-                                d: "M3 7 L12 13 L21 7",
-                                stroke: "#FFFFFF",
-                                stroke_width: "2.2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
+                Link { to: Route::Landing {},
+                    div { class: "landing-brand",
+                        span { class: "landing-brand-mark",
+                            svg {
+                                width: "18", height: "18",
+                                view_box: "0 0 24 24",
+                                fill: "none",
+                                xmlns: "http://www.w3.org/2000/svg",
+                                path {
+                                    d: "M3 7 L12 13 L21 7",
+                                    stroke: "#C9A961",
+                                    stroke_width: "2.4",
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                }
+                                path {
+                                    d: "M3 17 L12 13 L21 17",
+                                    stroke: "#C9A961",
+                                    stroke_width: "2.4",
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                    opacity: "0.5",
+                                }
+                                circle { cx: "12", cy: "13", r: "2.4", fill: "#C9A961" }
                             }
-                            path {
-                                d: "M3 17 L12 13 L21 17",
-                                stroke: "#FFFFFF",
-                                stroke_width: "2.2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                opacity: "0.6",
-                            }
-                            circle { cx: "12", cy: "13", r: "2.4", fill: "#FFFFFF" }
                         }
+                        span { class: "landing-brand-text", "Nitheky" }
                     }
-                    span { class: "landing-brand-text", "Pickando" }
                 }
                 nav { class: "landing-nav",
                     a { href: "#how", "Cómo funciona" }
@@ -47,10 +49,11 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     a { href: "#stack", "Stack" }
                     a { href: "#stats", "Métricas" }
                 }
-                button {
-                    class: "btn-primary btn-lg landing-cta",
-                    onclick: move |_| on_enter_platform.call(Page::Home),
-                    "Entrar a la plataforma →"
+                Link { to: Route::PlatformHome {},
+                    button { class: "btn-primary btn-lg landing-cta",
+                        "Entrar a la plataforma"
+                        span { "→" }
+                    }
                 }
             }
         }
@@ -59,46 +62,20 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         section { class: "landing-hero",
             div { class: "hero-glow" }
 
-            // Animated SVG showing routes converging — the visual
-            // metaphor for "same-direction mobility"
             div { class: "hero-route-bg",
                 svg {
                     view_box: "0 0 1200 800",
                     preserve_aspect_ratio: "xMidYMid slice",
                     xmlns: "http://www.w3.org/2000/svg",
-                    // Route 1: top-left to center
-                    path {
-                        class: "hero-route-line",
-                        d: "M 100 100 Q 400 200 600 400",
-                        opacity: "0.6",
-                    }
-                    // Route 2: top-right to center
-                    path {
-                        class: "hero-route-line",
-                        d: "M 1100 150 Q 800 300 600 400",
-                        opacity: "0.6",
-                        style: "animation-delay: -10s;",
-                    }
-                    // Route 3: bottom-left to center
-                    path {
-                        class: "hero-route-line",
-                        d: "M 150 700 Q 400 550 600 400",
-                        opacity: "0.6",
-                        style: "animation-delay: -20s;",
-                    }
-                    // Route 4: bottom-right to center
-                    path {
-                        class: "hero-route-line",
-                        d: "M 1050 650 Q 800 500 600 400",
-                        opacity: "0.6",
-                        style: "animation-delay: -30s;",
-                    }
-                    // Convergence points
-                    circle { cx: "600", cy: "400", r: "8", fill: "#00B894", opacity: "0.8" }
-                    circle { cx: "100", cy: "100", r: "5", fill: "#FF8A3D", opacity: "0.6" }
-                    circle { cx: "1100", cy: "150", r: "5", fill: "#FF8A3D", opacity: "0.6" }
-                    circle { cx: "150", cy: "700", r: "5", fill: "#FF8A3D", opacity: "0.6" }
-                    circle { cx: "1050", cy: "650", r: "5", fill: "#FF8A3D", opacity: "0.6" }
+                    path { class: "hero-route-line", d: "M 100 100 Q 400 200 600 400", opacity: "0.6" }
+                    path { class: "hero-route-line", d: "M 1100 150 Q 800 300 600 400", opacity: "0.6", style: "animation-delay: -10s;" }
+                    path { class: "hero-route-line", d: "M 150 700 Q 400 550 600 400", opacity: "0.6", style: "animation-delay: -20s;" }
+                    path { class: "hero-route-line", d: "M 1050 650 Q 800 500 600 400", opacity: "0.6", style: "animation-delay: -30s;" }
+                    circle { cx: "600", cy: "400", r: "8", fill: "#C9A961", opacity: "0.85" }
+                    circle { cx: "100", cy: "100", r: "5", fill: "#0A0A0A", opacity: "0.6" }
+                    circle { cx: "1100", cy: "150", r: "5", fill: "#0A0A0A", opacity: "0.6" }
+                    circle { cx: "150", cy: "700", r: "5", fill: "#0A0A0A", opacity: "0.6" }
+                    circle { cx: "1050", cy: "650", r: "5", fill: "#0A0A0A", opacity: "0.6" }
                 }
             }
 
@@ -117,15 +94,11 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     comparte el costo y reduce tu huella."
                 }
                 div { class: "hero-actions",
-                    button {
-                        class: "btn-primary btn-lg",
-                        onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "Buscar viaje cerca de ti"
+                    Link { to: Route::PlatformPassenger {},
+                        button { class: "btn-primary btn-lg", "Buscar viaje cerca de ti" }
                     }
-                    button {
-                        class: "btn-secondary btn-lg",
-                        onclick: move |_| on_enter_platform.call(Page::Driver),
-                        "Ofrecer mi ruta"
+                    Link { to: Route::PlatformDriver {},
+                        button { class: "btn-secondary btn-lg", "Ofrecer mi ruta" }
                     }
                 }
                 div { class: "hero-trust",
@@ -143,30 +116,15 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         // ===== Stats bar =====
         section { class: "landing-stats", id: "stats",
             div { class: "landing-stats-inner",
-                div { class: "stat",
-                    span { class: "stat-number", "70%" }
-                    span { class: "stat-label", "ahorro vs Uber" }
-                }
+                div { class: "stat", span { class: "stat-number", "70%" }, span { class: "stat-label", "ahorro vs Uber" } }
                 div { class: "stat-divider" }
-                div { class: "stat",
-                    span { class: "stat-number", "2.3 t" }
-                    span { class: "stat-label", "CO₂ evitado/año*" }
-                }
+                div { class: "stat", span { class: "stat-number", "2.3 t" }, span { class: "stat-label", "CO₂ evitado/año*" } }
                 div { class: "stat-divider" }
-                div { class: "stat",
-                    span { class: "stat-number", "1-2 km" }
-                    span { class: "stat-label", "radio de matching" }
-                }
+                div { class: "stat", span { class: "stat-number", "1-2 km" }, span { class: "stat-label", "radio de matching" } }
                 div { class: "stat-divider" }
-                div { class: "stat",
-                    span { class: "stat-number", "$0" }
-                    span { class: "stat-label", "costo de la demo" }
-                }
+                div { class: "stat", span { class: "stat-number", "$0" }, span { class: "stat-label", "costo de la demo" } }
                 div { class: "stat-divider" }
-                div { class: "stat",
-                    span { class: "stat-number", "6" }
-                    span { class: "stat-label", "rutas activas ahora" }
-                }
+                div { class: "stat", span { class: "stat-number", "6" }, span { class: "stat-label", "rutas activas ahora" } }
             }
             p { class: "landing-stats-footnote",
                 "*Estimado basado en 4 viajes/semana, 20 km/viaje compartidos con 1 persona más."
@@ -177,9 +135,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         section { class: "landing-section", id: "how",
             div { class: "landing-section-inner",
                 h2 { class: "section-title", "Cómo funciona" }
-                p { class: "section-subtitle",
-                    "Tres pasos. Treinta segundos. Cero fricción."
-                }
+                p { class: "section-subtitle", "Tres pasos. Treinta segundos. Cero fricción." }
                 div { class: "how-grid",
                     div { class: "how-step",
                         div { class: "how-step-num", "01" }
@@ -213,9 +169,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         section { class: "landing-section", id: "features",
             div { class: "landing-section-inner",
                 h2 { class: "section-title", "Features" }
-                p { class: "section-subtitle",
-                    "Funcionalidades demostrables — no promesas, código que corre"
-                }
+                p { class: "section-subtitle", "Funcionalidades demostrables — no promesas, código que corre" }
                 div { class: "features",
                     div { class: "feature-card",
                         div { class: "feature-icon", "01" }
@@ -249,8 +203,8 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     }
                     div { class: "feature-card",
                         div { class: "feature-icon", "06" }
-                        h3 { "Diseño con alma" }
-                        p { "Editorial warm, paleta cálida (forest green + terracotta), microinteracciones, animaciones, responsive mobile-first." }
+                        h3 { "Diseño con sistema" }
+                        p { "Mono Elegance + acento Alemán (Bauhaus). Grid 8px, escala 1.2, tipografía Inter, accesibilidad WCAG AAA." }
                         span { class: "feature-tag", "Funcional" }
                     }
                 }
@@ -261,9 +215,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         section { class: "landing-section", id: "stack",
             div { class: "landing-section-inner",
                 h2 { class: "section-title", "Stack" }
-                p { class: "section-subtitle",
-                    "Un lenguaje, un ecosistema, un codebase → todas las plataformas"
-                }
+                p { class: "section-subtitle", "Un lenguaje, un ecosistema, un codebase → todas las plataformas" }
                 div { class: "arch-grid",
                     div { class: "arch-block",
                         div { class: "arch-label", "Frontend" }
@@ -302,10 +254,8 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         // ===== Storytelling — María & Antonio =====
         section { class: "landing-section landing-story", id: "story",
             div { class: "landing-section-inner",
-                h2 { class: "section-title", "Una historia Pickando" }
-                p { class: "section-subtitle",
-                    "Así se ve un viaje compartido real — no un pitch, una historia."
-                }
+                h2 { class: "section-title", "Una historia Nitheky" }
+                p { class: "section-subtitle", "Así se ve un viaje compartido real — no un pitch, una historia." }
                 div { class: "story-card",
                     div { class: "story-actors",
                         div { class: "story-actor",
@@ -324,9 +274,9 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     }
                     div { class: "story-narrative",
                         p { "María va de lunes a viernes de Polanco al Centro. Antonio vive en Anzures y trabaja cerca del Zócalo." }
-                        p { strong { "Pickando los conectó en 3 minutos." } " María publicó su ruta a las 7:45 AM. Antonio la encontró a las 7:48 AM. Misma dirección, mismo horario, 0.6 km de distancia entre su origen y el de ella." }
+                        p { strong { "Nitheky los conectó en 3 minutos." } " María publicó su ruta a las 7:45 AM. Antonio la encontró a las 7:48 AM. Misma dirección, mismo horario, 0.6 km de distancia entre su origen y el de ella." }
                         p { "María ahorra " strong { "$800 al mes" } " en gasolina. Antonio paga " strong { "$40 por viaje" } " en lugar de los $120 que le cobraba Uber. Ambos redujeron " strong { "2.3 toneladas de CO₂" } " este año compartiendo el trayecto." }
-                        p { "Pickando no es Uber. No es dating. No es picking de productos. Es " em { "personas que ya van en la misma dirección" } ", conectadas de forma segura." }
+                        p { "Nitheky no es Uber. No es dating. No es picking de productos. Es " em { "personas que ya van en la misma dirección" } ", conectadas de forma segura." }
                     }
                 }
             }
@@ -338,17 +288,13 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                 h2 { "¿Listo para probarlo?" }
                 p { "Entra a la plataforma, busca viajes cerca de ti, publica tu ruta. \
                     Sin registro, sin costo, sin compromiso. Esta es una demo funcional \
-                    — lo que ves es lo que Pickando será." }
+                    — lo que ves es lo que Nitheky será." }
                 div { class: "landing-cta-actions",
-                    button {
-                        class: "btn-primary btn-lg",
-                        onclick: move |_| on_enter_platform.call(Page::Passenger),
-                        "Buscar viaje cerca de ti"
+                    Link { to: Route::PlatformPassenger {},
+                        button { class: "btn-primary btn-lg", "Buscar viaje cerca de ti" }
                     }
-                    button {
-                        class: "btn-secondary btn-lg",
-                        onclick: move |_| on_enter_platform.call(Page::About),
-                        "Ver qué demuestra esta demo"
+                    Link { to: Route::PlatformAbout {},
+                        button { class: "btn-secondary btn-lg", "Ver qué demuestra esta demo" }
                     }
                 }
             }
@@ -358,7 +304,7 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
         footer { class: "landing-footer",
             div { class: "landing-footer-inner",
                 div { class: "landing-footer-brand",
-                    span { class: "landing-footer-logo", "Pickando" }
+                    span { class: "landing-footer-logo", "Nitheky" }
                     span { class: "landing-footer-tagline", "Comparte el viaje, no el taxi · Demo funcional en Rust" }
                 }
                 div { class: "landing-footer-tech",
@@ -371,51 +317,9 @@ pub fn LandingPage(on_enter_platform: EventHandler<Page>) -> Element {
                     }
                 }
                 div { class: "landing-footer-info",
+                    h4 { "Demo" }
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.4.0 · Junio 2026 · Sendero Compartido" }
-                }
-            }
-        }
-    }
-}
-
-/// Platform home — distinct from marketing landing.
-/// Shows a quick dashboard / entry point to the platform sections.
-#[component]
-pub fn PlatformHome(on_navigate: EventHandler<Page>) -> Element {
-    rsx! {
-        section { class: "page-section",
-            div { class: "page-header",
-                h1 { "Plataforma Pickando" }
-                p { class: "page-subtitle",
-                    "Selecciona una sección para empezar"
-                }
-            }
-
-            div { class: "platform-cards",
-                div {
-                    class: "platform-card",
-                    onclick: move |_| on_navigate.call(Page::Passenger),
-                    div { class: "platform-card-icon", "01" }
-                    h3 { "Buscar viaje" }
-                    p { "Encuentra conductores que van en tu misma dirección. Matching con geohash + haversine + dirección + tiempo." }
-                    span { class: "platform-card-arrow", "→" }
-                }
-                div {
-                    class: "platform-card",
-                    onclick: move |_| on_navigate.call(Page::Driver),
-                    div { class: "platform-card-icon", "02" }
-                    h3 { "Publicar ruta" }
-                    p { "Publica tu ruta como conductor. Recibe pasajeros que van en tu misma dirección en tiempo real." }
-                    span { class: "platform-card-arrow", "→" }
-                }
-                div {
-                    class: "platform-card",
-                    onclick: move |_| on_navigate.call(Page::About),
-                    div { class: "platform-card-icon", "03" }
-                    h3 { "Acerca de la demo" }
-                    p { "Qué es real, qué es placeholder, qué es reutilizable. Tabla detallada + 8 endpoints documentados." }
-                    span { class: "platform-card-arrow", "→" }
+                    p { class: "footer-version", "v0.5.0 · Junio 2026 · Mono Elegance + DE-Gold" }
                 }
             }
         }

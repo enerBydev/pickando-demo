@@ -5,6 +5,79 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-06-19
+
+### Summary
+Major rebranding to **Nitheky** with **Mono Elegance + DE-Gold** design system,
+critical scroll bug fix, and strict architectural separation between Landing /
+Platform / Mobile via Dioxus Router. Applies the 10-level Rust/Dioxus methodology
+framework (Clean Architecture, SOLID, type-state enums, anti-pattern elimination).
+
+### Fixed — Critical
+- **Scroll bug eliminated at root cause**: `index.html` had `html, body { overflow: hidden;
+  height: 100%; }` declared at global scope for the loading screen — but never scoped back.
+  This broke scrolling for the ENTIRE app (page rendered only specific pixel ranges,
+  e.g. 0-200 then 250-600). Fix: scoped loading-screen CSS to `#loading-screen` only;
+  `html, body` now allow natural document flow with `overflow-x: hidden` only.
+- Removed the legacy state-based view switching (`View::Landing` vs `View::Platform`)
+  which prevented URL-based navigation and back-button support.
+
+### Changed — Strict architectural separation (Level 2: Separation of Concerns)
+- **Landing (`/`)**: marketing site, public, no app chrome
+- **Platform (`/app/*`)**: authenticated web app, navbar + footer chrome, desktop-optimized
+- **Mobile (`/m/*`)**: Android-optimized, bottom-nav, safe-area insets, touch-first
+- Each area is a separate module tree (`src/landing/`, `src/platform/`, `src/mobile/`)
+  with its own shell component — can be split into independent builds if needed.
+
+### Added — Dioxus Router (Level 5: Dioxus-specific architecture)
+- Type-safe `Route` enum with `#[derive(Routable)]` — compile-time verified URLs.
+- Eliminates "Stringly-typed" anti-pattern (Level 10): typos in link targets caught at compile.
+- All navigation uses `<Link to={Route::...}>` instead of event-handler callbacks.
+- Real URLs enable browser back/forward, deep linking, and bookmarking.
+
+### Added — Design System #09 "Mono Elegance + DE-Gold"
+- **Palette**: monocromo Suizo (`#0A0A0A` ink + perceptual grayscale) + único acento
+  oro mate Alemán `#C9A961` (Bauhaus / Wittmann).
+- **Inspiraciones fusionadas**:
+  - GBM: grilla estricta 8px, tipografía institucional Inter, jerarquía por contraste tipográfico
+  - Uber: densidad espacial, search-card from/to apilados, lista densa de conductores, CTA sólido
+  - inDrive: concepto "tú propones el precio" (offer-card con slider), acento cromático reinterpretado
+- **Tipografía**: Inter (display + body) + JetBrains Mono (data/labels)
+- **Algoritmo de tokens**: base 4px, escala 1.2, radii base 1.5
+- **Accesibilidad**: WCAG AAA 19.2:1 ink-on-paper
+
+### Changed — Rebranding Pickando → Nitheky
+- Updated: `index.html` meta tags, `Dioxus.toml` app name and bundle identifier,
+  `Cargo.toml` keywords, favicon SVG, Android `strings.xml`, `styles.xml`,
+  launcher icon foreground/background drawables.
+- Android WebView now loads `/m/` (mobile route) instead of `/` — strict separation.
+- Android theme colors updated to new brand (`#0A0A0A` ink + `#C9A961` accent).
+
+### Added — Mobile module (`/m/*`)
+- `MobileShell` with header + bottom-nav (sticky, safe-area aware)
+- `MobileHome`: Uber-style search-card + map + inDrive-style offer slider + driver list + CTA
+- `MobilePassenger`: compact passenger flow
+- `MobileDriver`: compact driver flow with passenger requests list
+- All mobile views use the same WASM bundle as landing/platform (Dioxus philosophy:
+  "learn once, write anywhere") but render mobile-specific layouts.
+
+### Methodology applied (10-level Rust/Dioxus framework)
+- **L1 (Scrum/Agile)**: CHANGELOG-driven development, semantic versioning
+- **L2 (SOLID/Clean Arch)**: module separation per bounded context
+- **L3 (TDD/CI)**: existing 40 tests pass, clippy clean with `-D warnings`
+- **L4 (Quality)**: zero compiler warnings, zero clippy warnings
+- **L5 (System Design)**: type-safe routing, signals-based reactivity
+- **L6 (Security)**: CSP-friendly (no inline scripts), scoped CSS, no `unsafe`
+- **L7 (Observability)**: structured module docs with methodology cross-refs
+- **L8 (Rust philosophy)**: fearless refactoring — full restructure compiles clean
+- **L9 (Modern concepts)**: WASM, full-stack Rust, edge-ready
+- **L10 (Anti-patterns eliminated)**:
+  - No "Stringly-typed" routes (enum instead)
+  - No "God struct" (separate shell/navbar/footer/home modules)
+  - No "Prop drilling" (Router context provides navigation)
+  - No "Hooks in conditionals" (all hooks at top of components)
+  - No "Global overflow:hidden" (the bug we fixed)
+
 ## [0.4.0] — 2026-06-19
 
 ### Summary
