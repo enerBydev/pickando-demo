@@ -6,7 +6,10 @@ default_platform = "web"
 asset_dir = "assets"
 
 [web.app]
-title = "Nitheky — Same-Direction Local Mobility"
+# Dioxus appends this string to whatever <title> is in index.html at build
+# time. We leave it empty so the static <title> in index.html is the sole
+# source of truth (better for SEO + crawlers that don't run JS).
+title = ""
 base_path = "/"
 
 [web.watcher]
