@@ -1638,11 +1638,39 @@ input, textarea, select { font-family: inherit; }
 }
 
 .platform-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--ink);
+    color: var(--de-gold);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-family: var(--font-mono);
     font-size: 0.85rem;
     font-weight: 700;
-    color: var(--de-gold-deep);
     letter-spacing: 0.1em;
+    margin-bottom: var(--space-2);
+    transition: background var(--transition), color var(--transition);
+}
+
+.platform-card:hover .platform-card-icon {
+    background: var(--de-gold);
+    color: var(--ink);
+}
+
+.platform-card-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--de-gold-deep);
+    background: var(--de-gold-soft);
+    padding: 3px 8px;
+    border-radius: var(--radius-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    align-self: flex-start;
 }
 
 .platform-card h3 {
@@ -1669,6 +1697,31 @@ input, textarea, select { font-family: inherit; }
 
 .platform-card:hover .platform-card-arrow {
     transform: translateX(4px);
+}
+
+/* Value-prop strip — short tagline below page header */
+.value-prop-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 8px 14px;
+    background: var(--mist);
+    border-radius: var(--radius-full);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--graphite);
+    letter-spacing: 0.04em;
+    margin-bottom: var(--space-4);
+}
+
+.value-prop-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--de-gold);
+    flex-shrink: 0;
+    animation: pulse-dot 2.4s ease-in-out infinite;
 }
 
 /* --- Match results / route cards --- */
@@ -2133,7 +2186,10 @@ input, textarea, select { font-family: inherit; }
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    overflow-y: auto;
+    /* CRITICAL: NO `overflow-y: auto` here.
+       Previous version had it, which created an inner scroll container
+       that clipped content on web view and broke document scroll.
+       Let the document (html/body) handle scrolling naturally. */
 }
 
 .mobile-search {
@@ -2359,6 +2415,31 @@ input, textarea, select { font-family: inherit; }
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition), transform var(--transition);
+    font-family: inherit;
+    text-align: left;
+    width: 100%;
+}
+
+.mobile-driver:hover {
+    border-color: var(--graphite);
+    background: var(--paper);
+}
+
+.mobile-driver:active {
+    transform: scale(0.99);
+}
+
+.mobile-driver.selected {
+    border-color: var(--ink);
+    background: var(--mist);
+    box-shadow: var(--shadow-sm);
+}
+
+.mobile-driver.selected .mobile-driver-avatar {
+    background: var(--ink);
+    color: var(--de-gold);
 }
 
 .mobile-driver-avatar {
@@ -2443,6 +2524,137 @@ input, textarea, select { font-family: inherit; }
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
+}
+
+/* Secondary CTA (Cancel) — paired with .mobile-cta */
+.mobile-cta-secondary {
+    width: 100%;
+    background: var(--white);
+    color: var(--ink);
+    border: 1px solid var(--border-strong);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.mobile-cta-secondary:hover {
+    border-color: var(--ink);
+    background: var(--mist);
+}
+
+.mobile-cta-secondary:active { transform: translateY(1px); }
+
+/* Inline accept/reject buttons for driver cards (mobile driver page) */
+.mobile-driver-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--mist);
+}
+
+.mobile-action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.mobile-action-btn.accept {
+    background: var(--ink);
+    color: var(--paper);
+}
+
+.mobile-action-btn.accept:hover {
+    background: var(--charcoal);
+}
+
+.mobile-action-btn.reject {
+    background: transparent;
+    color: var(--graphite);
+    border-color: var(--border);
+}
+
+.mobile-action-btn.reject:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+    background: var(--mist);
+}
+
+/* Refresh button — small icon button for headers */
+.mobile-refresh {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    border: 1px solid var(--border);
+    color: var(--graphite);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
+.mobile-refresh:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+    background: var(--mist);
+}
+
+.mobile-refresh:active {
+    transform: rotate(-90deg);
+}
+
+/* Confirmed state — when a driver is selected and confirmed */
+.mobile-driver.confirmed {
+    border-color: var(--de-gold);
+    background: var(--de-gold-soft);
+}
+
+.mobile-driver.confirmed .mobile-driver-avatar {
+    background: var(--de-gold);
+    color: var(--ink);
+}
+
+.mobile-driver.rejected {
+    opacity: 0.5;
+    border-style: dashed;
+}
+
+/* Selected price display under CTA */
+.mobile-selected-info {
+    background: var(--ink);
+    color: var(--paper);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.mobile-selected-info strong {
+    color: var(--de-gold);
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    font-weight: 700;
 }
 
 .mobile-nav {

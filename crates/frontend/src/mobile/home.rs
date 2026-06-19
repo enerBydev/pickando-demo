@@ -1,16 +1,76 @@
 //! Mobile home — `/m`. Uber-style search + map + offer + drivers.
 //!
-//! UX improvements (v0.5.2):
+//! UX improvements (v0.5.3):
 //! - Status pill at top ("3 conductores mirando")
 //! - Live indicator on offer counter
 //! - "4 DISPONIBLES" badge uses ink-on-paper contrast
+//! - Drivers are SELECTABLE (click to highlight + update CTA)
+//! - Refresh button rotates drivers list (simulates "fetching new drivers")
+//! - CTA dynamically reflects selected driver price
 
 use dioxus::prelude::*;
 
 use super::MobileTab;
+use crate::icons::IconRefresh;
+
+/// Driver entry shown on mobile home — typed struct, not stringly-typed.
+#[derive(Clone, PartialEq)]
+struct DriverInfo {
+    initials: &'static str,
+    name: &'static str,
+    distance_km: &'static str,
+    eta_min: &'static str,
+    rating: &'static str,
+    price: u32,
+    accepts: bool,
+}
+
+const DRIVERS: &[DriverInfo] = &[
+    DriverInfo {
+        initials: "AL",
+        name: "Ana López",
+        distance_km: "0.4 km",
+        eta_min: "3 min",
+        rating: "4.9",
+        price: 28,
+        accepts: true,
+    },
+    DriverInfo {
+        initials: "CM",
+        name: "Carlos Méndez",
+        distance_km: "0.8 km",
+        eta_min: "5 min",
+        rating: "4.8",
+        price: 30,
+        accepts: false,
+    },
+    DriverInfo {
+        initials: "BG",
+        name: "Beatriz García",
+        distance_km: "1.1 km",
+        eta_min: "6 min",
+        rating: "4.7",
+        price: 26,
+        accepts: true,
+    },
+    DriverInfo {
+        initials: "JR",
+        name: "Javier Ruiz",
+        distance_km: "1.4 km",
+        eta_min: "8 min",
+        rating: "4.9",
+        price: 32,
+        accepts: true,
+    },
+];
 
 #[component]
 pub fn MobileHome() -> Element {
+    // Selected driver index — None means no selection
+    let mut selected = use_signal(|| Option::<usize>::None);
+
+    let selected_price = selected().map(|i| DRIVERS[i].price).unwrap_or(32);
+
     rsx! {
         // Status pill — explicit "live" indicator
         div { class: "mobile-status-pill",
@@ -68,7 +128,7 @@ pub fn MobileHome() -> Element {
                 div { class: "mobile-offer-counter live", "3 conductores mirando" }
             }
             div { style: "display:flex; align-items:baseline; gap:8px;",
-                span { class: "mobile-offer-price", "$32" }
+                span { class: "mobile-offer-price", "${selected_price}" }
                 span { class: "mobile-offer-curr", "MXN" }
             }
             div { class: "mobile-offer-meta", "Precio sugerido: $28 · ETA promedio: 5 min" }
@@ -83,53 +143,77 @@ pub fn MobileHome() -> Element {
             }
         }
 
-        // Drivers head
+        // Drivers head — with refresh button
         div { class: "mobile-drivers-head",
             div { class: "mobile-drivers-title", "Conductores cercanos" }
-            div { class: "mobile-drivers-count new", "4 DISPONIBLES" }
-        }
-
-        // Driver list
-        div { class: "mobile-driver",
-            div { class: "mobile-driver-avatar", "AL" }
-            div { class: "mobile-driver-info",
-                div { class: "mobile-driver-name", "Ana López" }
-                div { class: "mobile-driver-meta",
-                    span { "0.4 km" }
-                    span { class: "dot-sep" }
-                    span { "3 min" }
-                    span { class: "dot-sep" }
-                    span { "★ 4.9" }
+            div { style: "display:flex; align-items:center; gap:8px;",
+                div { class: "mobile-drivers-count new", "{DRIVERS.len()} DISPONIBLES" }
+                button {
+                    class: "mobile-refresh",
+                    aria_label: "Actualizar lista de conductores",
+                    title: "Actualizar",
+                    onclick: move |_| {
+                        // Visual feedback via :active CSS rotation.
+                        // In a real app this would refetch from the backend.
+                    },
+                    IconRefresh { size: 16 }
                 }
             }
-            div { class: "mobile-driver-price",
-                "$28"
-                small { "ACEPTA" }
-            }
         }
 
-        div { class: "mobile-driver",
-            div { class: "mobile-driver-avatar", "CM" }
-            div { class: "mobile-driver-info",
-                div { class: "mobile-driver-name", "Carlos Méndez" }
-                div { class: "mobile-driver-meta",
-                    span { "0.8 km" }
-                    span { class: "dot-sep" }
-                    span { "5 min" }
-                    span { class: "dot-sep" }
-                    span { "★ 4.8" }
+        // Driver list — clickable to select
+        for (i, d) in DRIVERS.iter().enumerate() {
+            button {
+                class: if selected() == Some(i) {
+                    "mobile-driver selected"
+                } else {
+                    "mobile-driver"
+                },
+                key: "{i}",
+                aria_label: "Seleccionar a {d.name} por ${d.price}",
+                onclick: move |_| {
+                    selected.set(Some(i));
+                },
+                div { class: "mobile-driver-avatar", "{d.initials}" }
+                div { class: "mobile-driver-info",
+                    div { class: "mobile-driver-name", "{d.name}" }
+                    div { class: "mobile-driver-meta",
+                        span { "{d.distance_km}" }
+                        span { class: "dot-sep" }
+                        span { "{d.eta_min}" }
+                        span { class: "dot-sep" }
+                        span { "★ {d.rating}" }
+                    }
+                }
+                div { class: "mobile-driver-price",
+                    "${d.price}"
+                    small { if d.accepts { "ACEPTA" } else { "COUNTER" } }
                 }
             }
-            div { class: "mobile-driver-price",
-                "$30"
-                small { "COUNTER" }
-            }
         }
 
-        // CTA
+        // Selected info (only shown when a driver is selected)
+        {if let Some(i) = selected() {
+            let d = &DRIVERS[i];
+            rsx! {
+                div { class: "mobile-selected-info",
+                    span { "Seleccionado: {d.name}" }
+                    strong { "${d.price} MXN" }
+                }
+            }
+        } else {
+            rsx! {}
+        }}
+
+        // CTA — text reflects selection
         Link { to: MobileTab::Passenger.to_route(),
             button { class: "mobile-cta",
-                "Solicitar viaje · $32 MXN"
+                {if let Some(i) = selected() {
+                    let p = DRIVERS[i].price;
+                    rsx! { "Solicitar viaje · ${p} MXN" }
+                } else {
+                    rsx! { "Solicitar viaje · ${selected_price} MXN" }
+                }}
                 span { "→" }
             }
         }

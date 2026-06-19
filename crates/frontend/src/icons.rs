@@ -252,3 +252,65 @@ pub fn IconUpload(props: IconProps) -> Element {
         },
     )
 }
+
+/// Refresh / rotate — used for "refresh driver list" buttons.
+#[component]
+pub fn IconRefresh(props: IconProps) -> Element {
+    svg_wrapper(
+        &props,
+        rsx! {
+            polyline { points: "23 4 23 10 17 10" }
+            polyline { points: "1 20 1 14 7 14" }
+            path { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" }
+        },
+    )
+}
+
+/// Map — used for map preview widgets.
+#[component]
+pub fn IconMap(props: IconProps) -> Element {
+    svg_wrapper(
+        &props,
+        rsx! {
+            polygon { points: "1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" }
+            line { x1: "8", y1: "2", x2: "8", y2: "18" }
+            line { x1: "16", y1: "6", x2: "16", y2: "22" }
+        },
+    )
+}
+
+/// Route / navigation — used for route previews.
+#[component]
+pub fn IconRoute(props: IconProps) -> Element {
+    svg_wrapper(
+        &props,
+        rsx! {
+            circle { cx: "6", cy: "19", r: "3" }
+            path { d: "M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" }
+            circle { cx: "18", cy: "5", r: "3" }
+        },
+    )
+}
+
+/// Search — used for search inputs.
+#[component]
+pub fn IconSearch(props: IconProps) -> Element {
+    svg_wrapper(
+        &props,
+        rsx! {
+            circle { cx: "11", cy: "11", r: "8" }
+            line { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }
+        },
+    )
+}
+
+/// Star — used for ratings.
+#[component]
+pub fn IconStar(props: IconProps) -> Element {
+    svg_wrapper(
+        &props,
+        rsx! {
+            polygon { points: "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" }
+        },
+    )
+}

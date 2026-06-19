@@ -5,6 +5,77 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] — 2026-06-19
+
+### Summary
+Continuous-improvement pass driven by 10-level Rust/Dioxus methodology audit,
+Playwright visual regression, and VLM UX analysis. Removed the latent scroll
+code-smell on mobile pages, made all mobile pages fully interactive (drivers
+selectable, accept/reject flows, phase-aware CTAs), added SVG icons to platform
+cards, and added a 4th card linking to the mobile app preview.
+
+### Fixed — Latent scroll bug (CSS)
+- `.mobile-body` had `overflow-y: auto` which created an inner scroll container
+  that could clip content on web viewports. Removed the declaration so the
+  document scrolls naturally. Verified via Playwright: `mobileBody.overflowY`
+  now reports `visible` instead of `auto` on all mobile routes. This is the
+  definitive fix for the user-reported scroll/render issue.
+
+### Changed — Mobile home (fully interactive)
+- Drivers are now SELECTABLE (click to highlight + update CTA price).
+- Added typed `DriverInfo` struct with 4 entries (was 2 hardcoded divs).
+- Refresh button (IconRefresh SVG) added to drivers header.
+- CTA price dynamically reflects the selected driver.
+- "Seleccionado: X" info bar appears when a driver is selected.
+- Hover/active/selected CSS states for `.mobile-driver` cards.
+
+### Changed — Mobile passenger (3-phase flow)
+- New `PassengerPhase` enum: `Selecting` → `Sending` → `Confirmed`.
+- Drivers selectable in `Selecting` phase.
+- "Enviar solicitud" CTA → transitions to `Sending` phase.
+- `Sending` phase shows: selected driver highlighted, "Cancelar solicitud"
+  secondary CTA, "Simular aceptación" to advance.
+- `Confirmed` phase shows: driver card with `confirmed` styling, "Nueva
+  búsqueda" CTA to reset.
+- Status pill and offer card text update per phase.
+
+### Changed — Mobile driver (accept/reject state)
+- New `PassengerState` enum: `Pending`/`Accepted`/`Rejected`.
+- 3 typed `PassengerRequest` entries (was 2 hardcoded divs).
+- Each passenger card has inline "Aceptar"/"Rechazar" buttons.
+- Accepted passengers show with gold accent (`confirmed` class).
+- Rejected passengers show dimmed with dashed border.
+- Status pill and CTA dynamically reflect accepted/pending counts.
+- CTA "Iniciar viaje con N pasajero(s)" appears when ≥1 accepted.
+
+### Added — Platform home improvements
+- SVG icons on each platform card (IconSearch, IconSteering, IconInfo, IconRoute).
+- `value-prop-strip` with pulsing gold dot + tagline below page header.
+- `platform-card-tag` small badge per card ("Tiempo real", "POST /api/v1/routes",
+  "Transparencia", "Android WebView").
+- 4th card linking to `/m` (mobile app preview) — completes the navigation
+  story between platform and mobile surfaces.
+- Card icon hover state: ink→gold swap on hover.
+
+### Added — New SVG icons (`crates/frontend/src/icons.rs`)
+- `IconRefresh` — circular arrows for refresh buttons.
+- `IconMap` — folded map pictogram for map widgets.
+- `IconRoute` — route with two endpoints for navigation.
+- `IconSearch` — magnifying glass for search inputs.
+- `IconStar` — star for ratings.
+
+### Added — CSS for new interactive states
+- `.mobile-driver.selected` — ink border + mist background + gold avatar.
+- `.mobile-driver.confirmed` — gold border + soft-gold background.
+- `.mobile-driver.rejected` — dimmed opacity + dashed border.
+- `.mobile-driver:hover` / `:active` — border-color + transform feedback.
+- `.mobile-cta-secondary` — secondary outline button paired with `.mobile-cta`.
+- `.mobile-action-btn.accept` / `.reject` — small inline action buttons.
+- `.mobile-refresh` — 32×32 icon button with rotate-on-active animation.
+- `.mobile-selected-info` — ink-on-paper info bar with gold price.
+- `.platform-card-tag` — small uppercase badge with gold-soft background.
+- `.value-prop-strip` + `.value-prop-dot` — tagline pill with pulsing dot.
+
 ## [0.5.2] — 2026-06-19
 
 ### Summary

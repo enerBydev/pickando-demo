@@ -1,20 +1,76 @@
 //! Mobile passenger — `/m/passenger`. Compact passenger flow.
 //!
-//! UX improvements (v0.5.2):
+//! UX improvements (v0.5.3):
 //! - Live indicator (pulsing gold dot) on "Enviando…" status
 //! - Better visual hierarchy with status pill at top
 //! - Uses `mobile-drivers-count.new` accent for "CERCA" badge
 //! - Touch targets meet WCAG 2.5.5 (min 44x44 via .mobile-search-edit)
+//! - Drivers are SELECTABLE (click to highlight)
+//! - CTA can be cancelled after sending (simulated 2-phase flow)
+//! - "Seleccionar" → "Enviar solicitud" → "Enviando…" → "Confirmado"
 
 use dioxus::prelude::*;
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum PassengerPhase {
+    Selecting,
+    Sending,
+    Confirmed,
+}
+
+#[derive(Clone, PartialEq)]
+struct MatchDriver {
+    initials: &'static str,
+    name: &'static str,
+    distance: &'static str,
+    eta: &'static str,
+    rating: &'static str,
+    price: u32,
+}
+
+const DRIVERS: &[MatchDriver] = &[
+    MatchDriver {
+        initials: "AL",
+        name: "Ana López",
+        distance: "0.4 km",
+        eta: "3 min",
+        rating: "4.9",
+        price: 28,
+    },
+    MatchDriver {
+        initials: "CM",
+        name: "Carlos Méndez",
+        distance: "0.8 km",
+        eta: "5 min",
+        rating: "4.8",
+        price: 30,
+    },
+    MatchDriver {
+        initials: "BG",
+        name: "Beatriz García",
+        distance: "1.1 km",
+        eta: "6 min",
+        rating: "4.7",
+        price: 26,
+    },
+];
+
 #[component]
 pub fn MobilePassenger() -> Element {
+    let mut selected = use_signal(|| Option::<usize>::None);
+    let mut phase = use_signal(|| PassengerPhase::Selecting);
+
+    let offer_price = 32u32;
+
     rsx! {
         // Status pill — explicit "live" indicator at the top
         div { class: "mobile-status-pill",
             span { class: "mobile-status-pill-dot live" }
-            "Búsqueda en tiempo real · WS conectado"
+            {match phase() {
+                PassengerPhase::Selecting => "Búsqueda en tiempo real · WS conectado".to_string(),
+                PassengerPhase::Sending   => "Enviando solicitud a conductores…".to_string(),
+                PassengerPhase::Confirmed => "¡Viaje confirmado! Conductor en camino".to_string(),
+            }}
         }
 
         div { class: "mobile-search",
@@ -51,63 +107,199 @@ pub fn MobilePassenger() -> Element {
             }
         }
 
+        // Offer card — phase-aware
         div { class: "mobile-offer",
             div { class: "mobile-offer-row",
                 div { class: "mobile-offer-title", "Tu oferta" }
-                div { class: "mobile-offer-counter sending", "Enviando…" }
+                {match phase() {
+                    PassengerPhase::Selecting => rsx! {
+                        div { class: "mobile-offer-counter live", "3 conductores mirando" }
+                    },
+                    PassengerPhase::Sending => rsx! {
+                        div { class: "mobile-offer-counter sending", "Enviando…" }
+                    },
+                    PassengerPhase::Confirmed => rsx! {
+                        div { class: "mobile-offer-counter", style: "color: var(--de-green);",
+                            "✓ Confirmado"
+                        }
+                    },
+                }}
             }
             div { style: "display:flex; align-items:baseline; gap:8px;",
-                span { class: "mobile-offer-price", "$32" }
+                span { class: "mobile-offer-price",
+                    {if let Some(i) = selected() {
+                        format!("${}", DRIVERS[i].price)
+                    } else {
+                        format!("${offer_price}")
+                    }}
+                }
                 span { class: "mobile-offer-curr", "MXN" }
             }
-            div { class: "mobile-offer-meta", "3 conductores mirando tu solicitud" }
+            div { class: "mobile-offer-meta",
+                {match phase() {
+                    PassengerPhase::Selecting => "Selecciona un conductor para confirmar".to_string(),
+                    PassengerPhase::Sending   => "Esperando respuesta del conductor…".to_string(),
+                    PassengerPhase::Confirmed => "Ana López llega en 3 min · Honda Civic plate ABC-123".to_string(),
+                }}
+            }
         }
 
-        div { class: "mobile-drivers-head",
-            div { class: "mobile-drivers-title", "Matches encontrados" }
-            div { class: "mobile-drivers-count new", "3 CERCA" }
-        }
-
-        div { class: "mobile-driver",
-            div { class: "mobile-driver-avatar", "AL" }
-            div { class: "mobile-driver-info",
-                div { class: "mobile-driver-name", "Ana López" }
-                div { class: "mobile-driver-meta",
-                    span { "0.4 km" }
-                    span { class: "dot-sep" }
-                    span { "3 min" }
-                    span { class: "dot-sep" }
-                    span { "★ 4.9" }
+        // Drivers list — only show in Selecting phase
+        {match phase() {
+            PassengerPhase::Selecting => rsx! {
+                div { class: "mobile-drivers-head",
+                    div { class: "mobile-drivers-title", "Matches encontrados" }
+                    div { class: "mobile-drivers-count new", "{DRIVERS.len()} CERCA" }
                 }
-            }
-            div { class: "mobile-driver-price",
-                "$28"
-                small { "ACEPTA" }
-            }
-        }
 
-        div { class: "mobile-driver",
-            div { class: "mobile-driver-avatar", "CM" }
-            div { class: "mobile-driver-info",
-                div { class: "mobile-driver-name", "Carlos Méndez" }
-                div { class: "mobile-driver-meta",
-                    span { "0.8 km" }
-                    span { class: "dot-sep" }
-                    span { "5 min" }
-                    span { class: "dot-sep" }
-                    span { "★ 4.8" }
+                for (i, d) in DRIVERS.iter().enumerate() {
+                    button {
+                        class: if selected() == Some(i) {
+                            "mobile-driver selected"
+                        } else {
+                            "mobile-driver"
+                        },
+                        key: "{i}",
+                        aria_label: "Seleccionar a {d.name} por ${d.price}",
+                        onclick: move |_| {
+                            selected.set(Some(i));
+                        },
+                        div { class: "mobile-driver-avatar", "{d.initials}" }
+                        div { class: "mobile-driver-info",
+                            div { class: "mobile-driver-name", "{d.name}" }
+                            div { class: "mobile-driver-meta",
+                                span { "{d.distance}" }
+                                span { class: "dot-sep" }
+                                span { "{d.eta}" }
+                                span { class: "dot-sep" }
+                                span { "★ {d.rating}" }
+                            }
+                        }
+                        div { class: "mobile-driver-price",
+                            "${d.price}"
+                            small { "ACEPTA" }
+                        }
+                    }
                 }
-            }
-            div { class: "mobile-driver-price",
-                "$30"
-                small { "COUNTER" }
-            }
-        }
+            },
+            PassengerPhase::Sending => rsx! {
+                // Sending state — show selected driver highlighted
+                {if let Some(i) = selected() {
+                    let d = &DRIVERS[i];
+                    rsx! {
+                        div { class: "mobile-drivers-head",
+                            div { class: "mobile-drivers-title", "Enviando solicitud a" }
+                        }
+                        div { class: "mobile-driver selected",
+                            div { class: "mobile-driver-avatar", "{d.initials}" }
+                            div { class: "mobile-driver-info",
+                                div { class: "mobile-driver-name", "{d.name}" }
+                                div { class: "mobile-driver-meta",
+                                    span { "{d.distance}" }
+                                    span { class: "dot-sep" }
+                                    span { "{d.eta}" }
+                                    span { class: "dot-sep" }
+                                    span { "★ {d.rating}" }
+                                }
+                            }
+                            div { class: "mobile-driver-price",
+                                "${d.price}"
+                                small { "ENVIANDO" }
+                            }
+                        }
+                    }
+                } else {
+                    rsx! {}
+                }}
+            },
+            PassengerPhase::Confirmed => rsx! {
+                // Confirmed — show driver card with confirmed styling
+                {if let Some(i) = selected() {
+                    let d = &DRIVERS[i];
+                    rsx! {
+                        div { class: "mobile-drivers-head",
+                            div { class: "mobile-drivers-title", "Tu conductor" }
+                        }
+                        div { class: "mobile-driver confirmed",
+                            div { class: "mobile-driver-avatar", "{d.initials}" }
+                            div { class: "mobile-driver-info",
+                                div { class: "mobile-driver-name", "{d.name}" }
+                                div { class: "mobile-driver-meta",
+                                    span { "{d.distance}" }
+                                    span { class: "dot-sep" }
+                                    span { "{d.eta}" }
+                                    span { class: "dot-sep" }
+                                    span { "★ {d.rating}" }
+                                }
+                            }
+                            div { class: "mobile-driver-price",
+                                "${d.price}"
+                                small { "CONFIRMADO" }
+                            }
+                        }
+                    }
+                } else {
+                    rsx! {}
+                }}
+            },
+        }}
 
-        button {
-            class: "mobile-cta",
-            "Confirmar $32 MXN"
-            span { "→" }
-        }
+        // CTAs — phase-aware
+        {match phase() {
+            PassengerPhase::Selecting => rsx! {
+                button {
+                    class: "mobile-cta",
+                    disabled: selected().is_none(),
+                    onclick: move |_| {
+                        if selected().is_some() {
+                            phase.set(PassengerPhase::Sending);
+                            // Auto-advance to Confirmed after a short delay in a real app.
+                            // For demo: a second click would be needed; but we'll
+                            // simulate the confirmation here.
+                        }
+                    },
+                    {if let Some(i) = selected() {
+                        let p = DRIVERS[i].price;
+                        rsx! { "Enviar solicitud · ${p} MXN" }
+                    } else {
+                        rsx! { "Selecciona un conductor" }
+                    }}
+                    span { "→" }
+                }
+            },
+            PassengerPhase::Sending => rsx! {
+                // While sending: allow cancellation
+                button {
+                    class: "mobile-cta",
+                    onclick: move |_| {
+                        // Simulate driver accepting the request
+                        phase.set(PassengerPhase::Confirmed);
+                    },
+                    "Simular aceptación"
+                    span { "→" }
+                }
+                button {
+                    class: "mobile-cta-secondary",
+                    onclick: move |_| {
+                        // Cancel and return to selecting
+                        selected.set(None);
+                        phase.set(PassengerPhase::Selecting);
+                    },
+                    "Cancelar solicitud"
+                }
+            },
+            PassengerPhase::Confirmed => rsx! {
+                button {
+                    class: "mobile-cta",
+                    onclick: move |_| {
+                        // Reset for a new search
+                        selected.set(None);
+                        phase.set(PassengerPhase::Selecting);
+                    },
+                    "Nueva búsqueda"
+                    span { "→" }
+                }
+            },
+        }}
     }
 }
