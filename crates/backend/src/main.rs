@@ -109,6 +109,31 @@ async fn main() {
             "permissions-policy".parse().unwrap(),
             HeaderValue::from_static("geolocation=(), camera=(), microphone=(), payment=()"),
         ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            "content-security-policy".parse().unwrap(),
+            // CSP: only allow resources from same origin + Google Fonts (for Inter
+            // and JetBrains Mono) + data: URLs (for inline SVG). Blocking inline
+            // scripts would break Dioxus WASM loader, so we allow 'self' + 'unsafe-inline'
+            // for style attributes only.
+            HeaderValue::from_static(
+                "default-src 'self'; \
+                 script-src 'self'; \
+                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+                 font-src 'self' https://fonts.gstatic.com data:; \
+                 img-src 'self' data: https:; \
+                 connect-src 'self' ws: wss:; \
+                 frame-ancestors 'none'; \
+                 base-uri 'self'; \
+                 form-action 'self'",
+            ),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            // HSTS: only meaningful over HTTPS, but we set it on all responses.
+            // Browsers ignore it on HTTP. The max-age is 1 year; includeSubDomains
+            // would require all subdomains to be HTTPS, so we omit it.
+            "strict-transport-security".parse().unwrap(),
+            HeaderValue::from_static("max-age=31536000"),
+        ))
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
             let req_id = uuid::Uuid::new_v4().simple();
             tracing::info_span!(
