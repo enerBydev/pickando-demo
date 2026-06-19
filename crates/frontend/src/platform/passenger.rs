@@ -3,6 +3,7 @@ use pickando_shared::models::{MatchRequest, MatchResult, Route};
 use wasm_bindgen::JsCast;
 
 use crate::api;
+use crate::components::MiniMapSingle;
 use crate::icons::{IconAlert, IconClock, IconInfo, IconList, IconPin, IconPulse, IconUser, IconX};
 
 /// Passenger search page — the core matching feature demo.
@@ -154,6 +155,12 @@ pub fn PassengerPage() -> Element {
                             value: "{radius}",
                             oninput: move |e| radius.set(e.value()),
                         }
+                    }
+
+                    // Visual map preview — shows the search location with radius
+                    MiniMapSingle {
+                        height: 140,
+                        caption: Some("Ubicación de búsqueda · Radio visible"),
                     }
 
                     // Advanced filters (collapsible visually via CSS class)

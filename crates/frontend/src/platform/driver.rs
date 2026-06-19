@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use pickando_shared::models::Route;
 
 use crate::api;
+use crate::components::MiniMapRoute;
 use crate::icons::{IconAlert, IconCheck, IconInfo, IconX};
 
 /// Driver dashboard page.
@@ -133,6 +134,12 @@ pub fn DriverPage() -> Element {
                             oninput: move |e| time.set(e.value()),
                         }
                     }
+                }
+
+                // Route preview map — visualizes origin -> destination
+                MiniMapRoute {
+                    height: 160,
+                    caption: Some("Vista previa de la ruta · Origen (ink) → Destino (oro)"),
                 }
 
                 button {
