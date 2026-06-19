@@ -2759,6 +2759,22 @@ input, textarea, select { font-family: inherit; }
     .mobile-toggle { display: block; }
     .navbar-links { display: none; }
     .platform-badge { display: none; }
+
+    /* Compress hero on tablet */
+    .landing-hero {
+        padding: var(--space-12) var(--space-6) var(--space-10);
+    }
+    .hero-title {
+        font-size: clamp(2rem, 5vw, 3rem);
+    }
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+
+    /* Reduce vertical rhythm on tablet */
+    .landing-section {
+        padding: var(--space-12) var(--space-6);
+    }
 }
 
 /* Mobile */
@@ -2776,15 +2792,35 @@ input, textarea, select { font-family: inherit; }
     }
 
     .landing-hero {
-        padding: var(--space-16) var(--space-4) var(--space-12);
+        padding: var(--space-10) var(--space-4) var(--space-8);
+    }
+
+    .hero-title {
+        font-size: clamp(1.75rem, 8vw, 2.25rem);
+        line-height: 1.1;
+    }
+
+    .hero-subtitle {
+        font-size: 0.95rem;
+        line-height: 1.5;
     }
 
     .hero-actions { flex-direction: column; width: 100%; }
-    .hero-actions button { width: 100%; }
+    .hero-actions button { width: 100%; min-height: 44px; }
+
+    .hero-trust {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--space-2);
+    }
+
+    /* Hide decorative SVG route background on mobile — saves ~600px height */
+    .hero-route-bg { display: none; }
+    .hero-glow { opacity: 0.4; }
 
     .landing-stats-inner {
         flex-direction: column;
-        gap: var(--space-6);
+        gap: var(--space-4);
     }
 
     .stat-divider {
@@ -2792,8 +2828,28 @@ input, textarea, select { font-family: inherit; }
         height: 1px;
     }
 
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
     .landing-section {
-        padding: var(--space-16) var(--space-4);
+        padding: var(--space-10) var(--space-4);
+    }
+
+    /* Compress the story section significantly on mobile */
+    .story-section {
+        padding: var(--space-8) var(--space-4);
+    }
+    .story-card {
+        padding: var(--space-4);
+    }
+
+    .section-title {
+        font-size: clamp(1.5rem, 5vw, 1.875rem);
+    }
+
+    .section-subtitle {
+        font-size: 0.95rem;
     }
 
     .main-content {
@@ -2817,8 +2873,55 @@ input, textarea, select { font-family: inherit; }
     }
 
     .story-card {
-        padding: var(--space-6);
+        padding: var(--space-4);
     }
+
+    /* Touch targets ≥44px on mobile */
+    .btn-primary,
+    .btn-secondary,
+    .btn-ghost,
+    .nav-link,
+    .platform-tab,
+    .mobile-bottomnav-btn {
+        min-height: 44px;
+    }
+
+    /* Stack the about/demo tables vertically on mobile */
+    .reuse-table,
+    .endpoints-table {
+        font-size: 0.75rem;
+    }
+    .reuse-table th,
+    .reuse-table td,
+    .endpoints-table th,
+    .endpoints-table td {
+        padding: var(--space-2) var(--space-3);
+    }
+
+    /* Reduce the CTA strip padding on mobile */
+    .landing-cta-band,
+    .cta-band {
+        padding: var(--space-10) var(--space-4);
+    }
+
+    /* Reduce landing footer on mobile */
+    .landing-footer,
+    .footer {
+        padding: var(--space-8) var(--space-4);
+    }
+}
+
+/* Very small phones */
+@media (max-width: 380px) {
+    .landing-header-inner { padding: var(--space-2) var(--space-3); }
+    .landing-brand-text { font-size: 1rem; }
+    .landing-hero { padding: var(--space-8) var(--space-3) var(--space-6); }
+    .hero-title { font-size: 1.6rem; }
+    .landing-section { padding: var(--space-8) var(--space-3); }
+    .platform-cards { gap: var(--space-3); }
+    .feature-card,
+    .arch-block,
+    .how-card { padding: var(--space-4); }
 }
 
 /* Print */
