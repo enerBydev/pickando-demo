@@ -129,39 +129,56 @@ pub fn spawn_persistence_task(
 
         loop {
             interval.tick().await;
-
-            let routes_snapshot = routes.read().await.clone();
-            let ride_requests_snapshot = ride_requests.read().await.clone();
-            let state = PersistedState::new(routes_snapshot, ride_requests_snapshot);
-
-            let json = match serde_json::to_string_pretty(&state) {
-                Ok(j) => j,
-                Err(e) => {
-                    tracing::warn!("Failed to serialize state: {e}");
-                    continue;
-                }
-            };
-
-            // Write to a temp file first, then rename atomically
-            let tmp_path = path.with_extension("json.tmp");
-            match tokio::fs::write(&tmp_path, &json).await {
-                Ok(_) => {
-                    if let Err(e) = tokio::fs::rename(&tmp_path, &path).await {
-                        tracing::warn!("Failed to rename {tmp_path:?} to {path:?}: {e}");
-                        // Try to clean up the temp file
-                        let _ = tokio::fs::remove_file(&tmp_path).await;
-                        continue;
-                    }
-                    tracing::debug!(
-                        "State persisted: {} routes, {} ride_requests",
-                        state.routes.len(),
-                        state.ride_requests.len()
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to write state to {tmp_path:?}: {e}");
-                }
+            if let Err(e) = persist_state_once(&path, &routes, &ride_requests).await {
+                tracing::warn!("Persistence write failed: {e}");
             }
         }
     });
+}
+
+/// Persist the current state to disk atomically.
+///
+/// Writes to a `.tmp` file, calls `sync_all()` to flush the kernel page cache
+/// to disk (protecting against power loss), then atomically renames to the
+/// final path. The `sync_all` is the SRE audit 8-c P1 fix — without it, a
+/// power loss after rename could leave the file with zero bytes on disk
+/// even though `rename()` returned Ok.
+///
+/// Made `pub` so the graceful-shutdown handler can call it one final time
+/// before the process exits, ensuring no more than ~1s of state is lost
+/// (vs up to 30s without it).
+pub async fn persist_state_once(
+    path: &std::path::Path,
+    routes: &Arc<RwLock<Vec<Route>>>,
+    ride_requests: &Arc<RwLock<Vec<RideRequest>>>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let routes_snapshot = routes.read().await.clone();
+    let ride_requests_snapshot = ride_requests.read().await.clone();
+    let state = PersistedState::new(routes_snapshot, ride_requests_snapshot);
+
+    let json = serde_json::to_string_pretty(&state)?;
+
+    let tmp_path = path.with_extension("json.tmp");
+
+    // Write + sync the temp file…
+    {
+        let file = tokio::fs::File::create(&tmp_path).await?;
+        // Wrap in std file to call sync_all (not yet exposed by tokio::fs::File)
+        let std_file = file.into_std().await;
+        let mut buf_writer = std::io::BufWriter::new(&std_file);
+        use std::io::Write;
+        buf_writer.write_all(json.as_bytes())?;
+        buf_writer.flush()?;
+        std_file.sync_all()?;
+    }
+
+    // …then atomically swap into place.
+    tokio::fs::rename(&tmp_path, path).await?;
+
+    tracing::debug!(
+        "State persisted: {} routes, {} ride_requests",
+        state.routes.len(),
+        state.ride_requests.len()
+    );
+    Ok(())
 }

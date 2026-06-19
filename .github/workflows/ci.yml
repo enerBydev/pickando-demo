@@ -9,6 +9,15 @@ on:
     # Nightly security audit at 03:00 UTC
     - cron: "0 3 * * *"
 
+# Least-privilege permissions for the default GITHUB_TOKEN.
+# Security audit 8-a quick win #3 — without this, the token defaults to
+# `contents: write` on push events to main, which is more than CI needs.
+# (We only need `contents: read` for checkout + `actions: read` for
+# downloading cached artifacts.)
+permissions:
+  contents: read
+  actions: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1

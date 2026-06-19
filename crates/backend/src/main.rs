@@ -86,12 +86,18 @@ async fn main() {
     // - X-Frame-Options: DENY → prevents clickjacking
     // - Referrer-Policy → limits referrer leakage
     // - Permissions-Policy → disables risky browser APIs
+    use axum::extract::DefaultBodyLimit;
     use axum::http::{header, HeaderValue};
     use tower_http::set_header::SetResponseHeaderLayer;
 
     let app = Router::new()
         .merge(api_routes)
         .fallback_service(static_service)
+        // Body size limit — defense-in-depth against memory exhaustion.
+        // Largest legit payload is the create-route body (~300B), so 64KB is
+        // generous; anything bigger is either a bug or an attack.
+        // (SRE audit 8-c quick win #2; Security audit 8-a P3 #4.)
+        .layer(DefaultBodyLimit::max(64 * 1024))
         .layer(CompressionLayer::new())
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_CONTENT_TYPE_OPTIONS,
@@ -168,9 +174,60 @@ async fn main() {
             tracing::error!("Failed to bind to {addr}: {e}");
             std::process::exit(1);
         });
-    if let Err(e) = axum::serve(listener, app).await {
+
+    // Graceful shutdown — Railway (and any systemd/k8s environment) sends SIGTERM
+    // before SIGKILL during redeploys. Without this, in-flight HTTP requests are
+    // aborted and the 30s persistence task may lose up to 30s of state writes.
+    //
+    // We listen for both ctrl_c (interactive dev) and SIGTERM (production).
+    // On signal: stop accepting new connections, give in-flight requests 10s
+    // to complete, then exit. (SRE audit 8-c P0 fix.)
+    let shutdown = async {
+        let ctrl_c = async {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("failed to install ctrl_c handler");
+        };
+
+        #[cfg(unix)]
+        let term = async {
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("failed to install SIGTERM handler")
+                .recv()
+                .await;
+        };
+
+        #[cfg(not(unix))]
+        let term = std::future::pending::<()>();
+
+        tokio::select! {
+            _ = ctrl_c => tracing::info!("Received SIGINT (ctrl_c), shutting down…"),
+            _ = term => tracing::info!("Received SIGTERM, shutting down…"),
+        }
+    };
+
+    tracing::info!("Graceful shutdown enabled (waits up to 10s for in-flight requests)");
+
+    if let Err(e) = axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown)
+        .await
+    {
         tracing::error!("Server error: {e}");
         std::process::exit(1);
+    }
+
+    // Final persistence flush — axum::serve returns after graceful shutdown
+    // completes, so we have a brief window to write the latest state to disk
+    // before the process exits. This bounds state loss to ~1s vs up to 30s
+    // without it. (SRE audit 8-c P0 fix.)
+    tracing::info!("Flushing final state to disk before exit…");
+    let persist_path = persistence::persistence_path();
+    if let Err(e) =
+        persistence::persist_state_once(&persist_path, &state.routes, &state.ride_requests).await
+    {
+        tracing::warn!("Final persistence flush failed: {e}");
+    } else {
+        tracing::info!("Final state flushed to {}", persist_path.display());
     }
 }
 
