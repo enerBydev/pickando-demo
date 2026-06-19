@@ -112,12 +112,23 @@ async fn main() {
         .layer(SetResponseHeaderLayer::if_not_present(
             "content-security-policy".parse().unwrap(),
             // CSP: only allow resources from same origin + Google Fonts (for Inter
-            // and JetBrains Mono) + data: URLs (for inline SVG). Blocking inline
-            // scripts would break Dioxus WASM loader, so we allow 'self' + 'unsafe-inline'
-            // for style attributes only.
+            // and JetBrains Mono) + data: URLs (for inline SVG).
+            //
+            // CRITICAL: `script-src 'wasm-unsafe-eval'` is REQUIRED for Dioxus to
+            // compile/instantiate its WASM bundle. Without it, Chrome/Firefox throw
+            // `CompileError: WebAssembly.compile() violates CSP directive "script-src 'self'"`
+            // and the app never mounts — the loading screen stays forever.
+            //
+            // 'wasm-unsafe-eval' is the W3C-recommended, narrowly-scoped directive
+            // (https://www.w3.org/TR/CSP3/#directive-script-src) that ONLY permits
+            // WebAssembly, NOT general eval()/Function(). It is much safer than
+            // 'unsafe-eval' and is supported by all modern browsers since 2022.
+            //
+            // 'unsafe-inline' on style-src is required because Dioxus injects inline
+            // style attributes on elements (e.g., `style="color: var(--ink)"`).
             HeaderValue::from_static(
                 "default-src 'self'; \
-                 script-src 'self'; \
+                 script-src 'self' 'wasm-unsafe-eval'; \
                  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
                  font-src 'self' https://fonts.gstatic.com data:; \
                  img-src 'self' data: https:; \
