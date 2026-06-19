@@ -2,6 +2,7 @@
 
 use dioxus::prelude::*;
 
+use crate::icons::{IconHome, IconSteering, IconTarget};
 use crate::Route;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -21,15 +22,21 @@ impl MobileTab {
     }
 }
 
+/// Render the correct icon component for a tab — no emoji strings.
+fn render_tab_icon(tab: MobileTab) -> Element {
+    match tab {
+        MobileTab::Home => rsx! { IconHome { size: 22 } },
+        MobileTab::Passenger => rsx! { IconTarget { size: 22 } },
+        MobileTab::Driver => rsx! { IconSteering { size: 22 } },
+    }
+}
+
 #[component]
-pub fn MobileShell(
-    active: MobileTab,
-    children: Element,
-) -> Element {
+pub fn MobileShell(active: MobileTab, children: Element) -> Element {
     let nav_items = [
-        ("⌂", "Inicio", MobileTab::Home),
-        ("⌖", "Pasajero", MobileTab::Passenger),
-        ("⚠", "Conductor", MobileTab::Driver),
+        ("Inicio", MobileTab::Home),
+        ("Pasajero", MobileTab::Passenger),
+        ("Conductor", MobileTab::Driver),
     ];
 
     rsx! {
@@ -49,11 +56,11 @@ pub fn MobileShell(
 
             // Bottom nav
             nav { class: "mobile-nav",
-                for (icon, label, tab) in nav_items {
+                for (label, tab) in nav_items {
                     Link { to: tab.to_route(),
                         button {
                             class: if active == tab { "mobile-nav-item active" } else { "mobile-nav-item" },
-                            div { class: "mobile-nav-icon", "{icon}" }
+                            div { class: "mobile-nav-icon", {render_tab_icon(tab)} }
                             div { "{label}" }
                         }
                     }

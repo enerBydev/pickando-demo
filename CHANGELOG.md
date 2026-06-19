@@ -5,6 +5,55 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-06-19
+
+### Summary
+Continuous-improvement pass: removed every emoji and Unicode-glyph icon
+from the frontend, replacing them with a shared inline-SVG icon set. This
+aligns the codebase with the #09-v2 design system rule ("NO emoji icons")
+and guarantees pixel-identical rendering across browsers / OSes.
+
+### Added — `crates/frontend/src/icons.rs`
+- Single source of truth for all UI pictograms (Level 2: composition).
+- 14 components: `IconPin`, `IconList`, `IconPulse`, `IconClock`, `IconUser`,
+  `IconUsers`, `IconHome`, `IconTarget`, `IconSteering`, `IconCheck`, `IconX`,
+  `IconInfo`, `IconAlert`, `IconArrowRight`, `IconDownload`, `IconUpload`.
+- Each accepts `size` (default 16) and optional `class`.
+- All inherit `currentColor` for theme integration.
+
+### Changed — Emoji purge
+- `mobile/shell.rs`: replaced `⌂`/`⌖`/`⚠` glyphs with `IconHome`,
+  `IconTarget`, `IconSteering` SVG components in the bottom nav.
+- `platform/passenger.rs`:
+  - `📋 Rutas` → `IconList` + "Rutas"
+  - `🔴 WebSocket` → `IconPulse` + "WebSocket"
+  - `📍 {location}` preset buttons → `IconPin` SVG
+  - `📍 {distance} km` in match cards → `IconPin` SVG
+  - `⏱ Latencia` → `IconClock` SVG
+  - `🕐 {time}` → `IconClock` SVG
+  - `💺 {seats}` → `IconUser` SVG
+  - WS log markers `✅`/`❌`/`📥`/`📤` → ASCII `[+]`/`[!]`/`[<]`/`[>]`
+    (text-only log, no icon needed).
+- `platform/about.rs`: removed `✅` from quality-list items; the list now
+  uses a `::before` gold dash marker (CSS-only, no character).
+
+### Added — CSS for new icon containers
+- `.tab-icon`, `.btn-icon` — inline-flex wrappers for SVG in tab/button labels.
+- `.match-meta-inline`, `.match-distance`, `.match-distance-icon`,
+  `.route-meta`, `.route-meta-item` — flex containers for match-card metadata.
+- `.quality-list` and `.quality-list li::before` — replaces `✅` glyphs with
+  a 14×2px gold dash (Bauhaus-style typographic mark).
+
+### Verified
+- `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace`
+  (40 tests + 1 doc test) all green.
+- `dx build --platform web --release` succeeds, produces WASM bundle.
+- Backend smoke test: 6 endpoints all return expected JSON.
+- Visual regression (Playwright + VLM): all 8 routes (landing, 4× platform,
+  3× mobile) render correctly; no emojis detected; no layout overlap;
+  scroll heights grow naturally with content (e.g. landing=4529px,
+  about=4635px, passenger=1228px) — confirms the v0.5.0 scroll fix holds.
+
 ## [0.5.0] — 2026-06-19
 
 ### Summary

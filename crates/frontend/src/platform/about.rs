@@ -187,17 +187,17 @@ pub fn AboutPage() -> Element {
             div { class: "card",
                 h2 { "Calidad y garantías" }
                 ul { class: "quality-list",
-                    li { "✅ 50+ tests automatizados (unit + property + integration)" }
-                    li { "✅ cargo clippy con -D warnings en CI" }
-                    li { "✅ cargo fmt --check en CI" }
-                    li { "✅ cargo audit contra RustSec advisory DB" }
-                    li { "✅ cargo deny para licencias y bans" }
-                    li { "✅ Cargo.lock commiteado para builds reproducibles" }
-                    li { "✅ Profiles de release con LTO + strip + codegen-units=1" }
-                    li { "✅ Sin bloques unsafe en el workspace" }
-                    li { "✅ Conventional Commits + CHANGELOG" }
-                    li { "✅ 6 ADRs documentando decisiones" }
-                    li { "✅ SECURITY.md + CONTRIBUTING.md + CODE_OF_CONDUCT.md" }
+                    li { "50+ tests automatizados (unit + property + integration)" }
+                    li { "cargo clippy con -D warnings en CI" }
+                    li { "cargo fmt --check en CI" }
+                    li { "cargo audit contra RustSec advisory DB" }
+                    li { "cargo deny para licencias y bans" }
+                    li { "Cargo.lock commiteado para builds reproducibles" }
+                    li { "Profiles de release con LTO + strip + codegen-units=1" }
+                    li { "Sin bloques unsafe en el workspace" }
+                    li { "Conventional Commits + CHANGELOG" }
+                    li { "6 ADRs documentando decisiones" }
+                    li { "SECURITY.md + CONTRIBUTING.md + CODE_OF_CONDUCT.md" }
                 }
             }
         }

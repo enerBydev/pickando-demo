@@ -2,8 +2,8 @@
 
 use dioxus::prelude::*;
 
-use crate::Route;
 use super::PlatformTab;
+use crate::Route;
 
 #[component]
 pub fn Navbar(active: PlatformTab) -> Element {

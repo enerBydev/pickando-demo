@@ -25,6 +25,7 @@
 //!   lives in `use_context`, not passed through props.
 
 mod api;
+mod icons;
 mod landing;
 mod mobile;
 mod platform;

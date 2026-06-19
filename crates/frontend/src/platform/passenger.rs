@@ -3,6 +3,7 @@ use pickando_shared::models::{MatchRequest, MatchResult, Route};
 use wasm_bindgen::JsCast;
 
 use crate::api;
+use crate::icons::{IconClock, IconList, IconPin, IconPulse, IconUser};
 
 /// Passenger search page — the core matching feature demo.
 ///
@@ -71,12 +72,14 @@ pub fn PassengerPage() -> Element {
                 button {
                     class: if active_tab() == 1 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(1),
-                    "📋 Rutas ({all_routes().len()})"
+                    span { class: "tab-icon", IconList { size: 14 } }
+                    "Rutas ({all_routes().len()})"
                 }
                 button {
                     class: if active_tab() == 2 { "tab active" } else { "tab" },
                     onclick: move |_| active_tab.set(2),
-                    "🔴 WebSocket"
+                    span { class: "tab-icon", IconPulse { size: 14 } }
+                    "WebSocket"
                 }
                 button {
                     class: if active_tab() == 3 { "tab active" } else { "tab" },
@@ -180,7 +183,8 @@ pub fn PassengerPage() -> Element {
                                 lng.set("-99.1332".into());
                                 radius.set("5".into());
                             },
-                            "📍 Zócalo CDMX"
+                            span { class: "btn-icon", IconPin { size: 14 } }
+                            "Zócalo CDMX"
                         }
                         button {
                             class: "btn-sm btn-secondary",
@@ -189,7 +193,8 @@ pub fn PassengerPage() -> Element {
                                 lng.set("-99.1450".into());
                                 radius.set("3".into());
                             },
-                            "📍 Reforma CDMX"
+                            span { class: "btn-icon", IconPin { size: 14 } }
+                            "Reforma CDMX"
                         }
                         button {
                             class: "btn-sm btn-secondary",
@@ -198,7 +203,8 @@ pub fn PassengerPage() -> Element {
                                 lng.set("-100.4412".into());
                                 radius.set("5".into());
                             },
-                            "📍 Monterrey"
+                            span { class: "btn-icon", IconPin { size: 14 } }
+                            "Monterrey"
                         }
                     }
 
@@ -286,7 +292,10 @@ pub fn PassengerPage() -> Element {
 
                     if last_query_ms() > 0 {
                         div { class: "match-meta",
-                            span { "⏱ Latencia: {last_query_ms()}ms" }
+                            span { class: "match-meta-inline",
+                                IconClock { size: 14 }
+                                "Latencia: {last_query_ms()}ms"
+                            }
                         }
                     }
 
@@ -299,7 +308,8 @@ pub fn PassengerPage() -> Element {
                                     div { class: "match-header",
                                         span { class: "route-id", "{m.route.id}" }
                                         span { class: "match-distance",
-                                            "📍 {m.distance_km} km"
+                                            span { class: "match-distance-icon", IconPin { size: 12 } }
+                                            "{m.distance_km} km"
                                         }
                                     }
                                     div { class: "match-body",
@@ -312,8 +322,14 @@ pub fn PassengerPage() -> Element {
                                             span { "{m.route.dest_address}" }
                                         }
                                         div { class: "route-meta",
-                                            span { "🕐 {m.route.departure_time}" }
-                                            span { "💺 {m.route.seats_available}" }
+                                            span { class: "route-meta-item",
+                                                IconClock { size: 12 }
+                                                "{m.route.departure_time}"
+                                            }
+                                            span { class: "route-meta-item",
+                                                IconUser { size: 12 }
+                                                "{m.route.seats_available}"
+                                            }
                                         }
                                     }
                                     div { class: "match-scores",
@@ -496,7 +512,7 @@ fn WebSocketDemo() -> Element {
                     *count_handle.write() = 0;
                     messages_handle
                         .write()
-                        .push("✅ Conectado al servidor WebSocket".into());
+                        .push("[+] Conectado al servidor WebSocket".into());
                 });
             ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
             onopen.forget();
@@ -522,7 +538,7 @@ fn WebSocketDemo() -> Element {
                         *count_handle2.write() += 1;
                         messages_handle2
                             .write()
-                            .push(format!("📥 [{label}] {pretty}"));
+                            .push(format!("[<] [{label}] {pretty}"));
                     }
                 },
             );
@@ -536,7 +552,7 @@ fn WebSocketDemo() -> Element {
                 wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::CloseEvent)>::new(move |_e| {
                     connected_handle2.set(false);
                     ws_handle_clone3.set(None);
-                    messages_handle3.write().push("❌ Conexión cerrada".into());
+                    messages_handle3.write().push("[!] Conexión cerrada".into());
                 });
             ws.set_onclose(Some(onclose.as_ref().unchecked_ref()));
             onclose.forget();
@@ -553,7 +569,7 @@ fn WebSocketDemo() -> Element {
         } else {
             messages
                 .write()
-                .push("❌ No se pudo crear el WebSocket".into());
+                .push("[!] No se pudo crear el WebSocket".into());
         }
     };
 
@@ -562,7 +578,7 @@ fn WebSocketDemo() -> Element {
             let text = input_text();
             if !text.is_empty() {
                 ws.send_with_str(&text).ok();
-                messages.write().push(format!("📤 {text}"));
+                messages.write().push(format!("[>] {text}"));
                 input_text.set(String::new());
             }
         }

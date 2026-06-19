@@ -2,8 +2,8 @@
 
 use dioxus::prelude::*;
 
-use crate::Route;
 use super::{Footer, Navbar};
+use crate::Route;
 
 /// Identifies which tab is active in the navbar.
 ///
@@ -19,10 +19,7 @@ pub enum PlatformTab {
 
 /// Wraps platform pages with the navbar + footer chrome.
 #[component]
-pub fn PlatformShell(
-    active: PlatformTab,
-    children: Element,
-) -> Element {
+pub fn PlatformShell(active: PlatformTab, children: Element) -> Element {
     rsx! {
         Navbar { active }
 
