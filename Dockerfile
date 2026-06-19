@@ -73,16 +73,24 @@ RUN cd crates/frontend && dx build --platform web --release
 # tag into the built index.html. We must copy it manually or the browser gets
 # a 404 for /assets/main.css and the page renders unstyled (and may appear
 # stuck on the loading screen if the WASM also fails to mount).
+#
+# Same applies to favicon.svg and watchdog.js — Dioxus doesn't copy them
+# automatically. watchdog.js is referenced by index.html as
+# <script src="/assets/watchdog.js"></script> and is REQUIRED for the
+# loading screen to be removed after the WASM mounts.
 RUN mkdir -p /app/target/dx/pickando-frontend/release/web/public/assets && \
     cp /app/crates/frontend/assets/main.css \
        /app/target/dx/pickando-frontend/release/web/public/assets/main.css && \
     cp /app/crates/frontend/assets/favicon.svg \
-       /app/target/dx/pickando-frontend/release/web/public/assets/favicon.svg
+       /app/target/dx/pickando-frontend/release/web/public/assets/favicon.svg && \
+    cp /app/crates/frontend/assets/watchdog.js \
+       /app/target/dx/pickando-frontend/release/web/public/assets/watchdog.js
 
 # Verify the expected output files exist — fail loudly if missing
 RUN test -f /app/target/dx/pickando-frontend/release/web/public/index.html && \
     test -f /app/target/dx/pickando-frontend/release/web/public/assets/main.css && \
-    echo "[OK] index.html + main.css present" && \
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/watchdog.js && \
+    echo "[OK] index.html + main.css + watchdog.js present" && \
     ls -la /app/target/dx/pickando-frontend/release/web/public/ && \
     ls -la /app/target/dx/pickando-frontend/release/web/public/assets/
 
