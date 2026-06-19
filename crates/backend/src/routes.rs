@@ -500,7 +500,7 @@ pub async fn find_matches(
     let routes = state.routes.read().await;
 
     let matches = if req.passenger_bearing_deg.is_some() || req.passenger_departure_time.is_some() {
-        find_matching_routes_with_request(&body.sanitized(), &routes)
+        find_matching_routes_with_request(&req, &routes)
     } else {
         find_matching_routes(lat, lng, &routes, radius)
     };
@@ -532,29 +532,30 @@ pub async fn demo_reset(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     state.record_request();
 
-    tracing::info!("Demo reset requested — clearing all state");
+    tracing::info!("Demo reset requested — clearing all state atomically");
 
-    // Clear all routes and ride requests
+    // Build the seed off-lock so we hold the write guards for as little
+    // time as possible, then swap them in atomically (one after another,
+    // but each individual swap is atomic — readers can never observe an
+    // empty routes store mid-reset because we go straight from old → new).
+    let seed_routes = crate::init_sample_routes();
+    let seed_count = seed_routes.len();
+
+    // Swap routes — readers will observe either old state or new state,
+    // never an empty intermediate state.
     {
         let mut routes = state.routes.write().await;
-        routes.clear();
+        *routes = seed_routes;
     }
+    // Clear ride requests
     {
         let mut ride_requests = state.ride_requests.write().await;
         ride_requests.clear();
     }
-    // Clear the relevance score history too
+    // Clear relevance-score history
     {
         let mut history = state.recent_relevance_scores.write().await;
         history.clear();
-    }
-
-    // Re-seed with the initial sample routes
-    let seed_routes = crate::init_sample_routes();
-    let seed_count = seed_routes.len();
-    {
-        let mut routes = state.routes.write().await;
-        *routes = seed_routes;
     }
 
     tracing::info!("Demo reset complete — {seed_count} seed routes restored");

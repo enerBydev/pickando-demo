@@ -237,11 +237,62 @@ pub fn PassengerPage() -> Element {
                         onclick: move |_| async move {
                             loading.set(true);
                             error_msg.set(String::new());
-                            let lat_val = lat().parse::<f64>().unwrap_or(19.4326);
-                            let lng_val = lng().parse::<f64>().unwrap_or(-99.1332);
-                            let radius_val = radius().parse::<f64>().unwrap_or(5.0);
-                            let bearing_val = bearing().trim().parse::<f64>().ok();
-                            let time_window_val = time_window().trim().parse::<i64>().ok();
+
+                            // Validate input explicitly — never silently fall back to
+                            // CDMX coords. If the user typed bad input, tell them.
+                            let lat_val = match lat().trim().parse::<f64>() {
+                                Ok(v) => v,
+                                Err(_) => {
+                                    error_msg.set("Latitud inválida — escribe un número decimal (ej. 19.4326)".into());
+                                    loading.set(false);
+                                    return;
+                                }
+                            };
+                            let lng_val = match lng().trim().parse::<f64>() {
+                                Ok(v) => v,
+                                Err(_) => {
+                                    error_msg.set("Longitud inválida — escribe un número decimal (ej. -99.1332)".into());
+                                    loading.set(false);
+                                    return;
+                                }
+                            };
+                            let radius_val = match radius().trim().parse::<f64>() {
+                                Ok(v) if v > 0.0 && v <= 200.0 => v,
+                                Ok(_) => {
+                                    error_msg.set("Radio inválido — debe estar entre 0 y 200 km".into());
+                                    loading.set(false);
+                                    return;
+                                }
+                                Err(_) => {
+                                    error_msg.set("Radio inválido — escribe un número (ej. 5)".into());
+                                    loading.set(false);
+                                    return;
+                                }
+                            };
+                            let bearing_val = if bearing().trim().is_empty() {
+                                None
+                            } else {
+                                match bearing().trim().parse::<f64>() {
+                                    Ok(v) if (-360.0..=360.0).contains(&v) => Some(v),
+                                    _ => {
+                                        error_msg.set("Rumbo inválido — debe ser un ángulo entre -360 y 360".into());
+                                        loading.set(false);
+                                        return;
+                                    }
+                                }
+                            };
+                            let time_window_val = if time_window().trim().is_empty() {
+                                None
+                            } else {
+                                match time_window().trim().parse::<i64>() {
+                                    Ok(v) if v > 0 => Some(v),
+                                    _ => {
+                                        error_msg.set("Ventana de tiempo inválida — debe ser un entero positivo (minutos)".into());
+                                        loading.set(false);
+                                        return;
+                                    }
+                                }
+                            };
                             let passenger_time_val = if passenger_time().trim().is_empty() {
                                 None
                             } else {
