@@ -5,6 +5,81 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] — 2026-06-19
+
+### Summary
+Continuous-improvement pass driven by Playwright visual regression and VLM
+UX audits. Closed all remaining console 404s, replaced residual text-glyph
+icons with SVG components, added loading spinners, improved mobile touch
+targets, and tightened the visual hierarchy of the About page. The demo
+now ships with a complete PWA asset set (favicons, manifest, OG image).
+
+### Added — PWA assets (`crates/frontend/assets/`)
+- `favicon-16.png`, `favicon-32.png` — pixel-perfect brand mark at standard
+  favicon sizes, generated from the same Nitheky "N + gold dot" mark used
+  in the loading screen.
+- `apple-touch-icon.png` (180×180) — Apple-style solid-bg variant.
+- `og-image.png` (1200×630) — social-share preview with headline,
+  sub-headline, gold underline accent, and three key metrics.
+- `site.webmanifest` — full PWA manifest with name, short_name, theme_color
+  (#0A0A0A), background_color (#FAFAFA), standalone display, and the four
+  icon entries. Eliminates the `manifest` 404 from the browser console.
+
+### Added — Loading spinners (CSS + component integration)
+- `@keyframes nitheky-spin` + `.spinner` / `.spinner-lg` / `.spinner-on-dark`
+  classes — pure-CSS spinning ring that inherits `currentColor` for theme
+  integration.
+- Wired into all async buttons:
+  - `platform/driver.rs` "Publicar Ruta" → spinner + "Publicando..."
+  - `platform/passenger.rs` "Buscar Matches" → spinner + "Buscando..."
+  - `platform/passenger.rs` "Recargar rutas" → spinner + "Cargando..."
+  - `platform/passenger.rs` "Cargar métricas" → spinner + "Cargando..."
+
+### Added — Mobile status pill
+- New `.mobile-status-pill` + `.mobile-status-pill-dot.live` classes for a
+  top-of-page live indicator (ink background, gold pulsing dot, paper text).
+- Added to `mobile/home.rs`, `mobile/passenger.rs`, `mobile/driver.rs` so
+  every mobile route opens with a clear "live demo" affordance.
+
+### Changed — Iconography (continued emoji/glyph purge)
+- `platform/driver.rs`: `i`/`✓`/`!`/`×` glyphs replaced with `IconInfo`,
+  `IconCheck`, `IconAlert`, `IconX` SVG components. All alert-close buttons
+  now use `IconX` + `aria_label` for accessibility.
+- `platform/passenger.rs`: same treatment — `i`/`!`/`×` glyphs replaced
+  with SVG icons. Demo banner uses `IconInfo`.
+
+### Changed — CSS interactions
+- `.alert-close` — now a 32×32 button with hover background, focus-visible
+  outline, and proper transition. Meets WCAG 2.4.7 (Focus Visible).
+- `.mobile-search-edit` — converted from `<div>` to `<button>` with
+  negative-margin trick to keep visual layout identical while expanding
+  the touch target to ~44×44 (WCAG 2.5.5 Target Size). Adds hover and
+  active background states for tactile feedback.
+- `.mobile-offer-counter` — now flex with optional `::before` pulse dot.
+  `.live` variant pulses at 1.6s, `.sending` at 0.8s for visual urgency.
+- `.mobile-drivers-count` — promoted from gray text to a mist-bg pill.
+  `.new` variant uses ink-bg + paper-text for high prominence.
+- `.mobile-cta:disabled` — proper disabled state (gray bg, no shadow).
+- `.card-accent` — new modifier that adds a 36×3px gold top accent bar to
+  About page cards, providing clear section separation without dividers.
+
+### Changed — About page visual hierarchy
+- All 5 cards on `/app/about` now use `card-accent` class for consistent
+  gold top-bar accent — addresses VLM feedback about flat section
+  differentiation.
+
+### Verified
+- `cargo fmt --check`, `cargo clippy --all-targets` (zero warnings),
+  `cargo test --workspace` (40 tests + 1 doc test) — all green.
+- `dx build --platform web --release` — WASM bundle produced, ~826 KB.
+- Backend serves all 5 new asset types with correct MIME types
+  (`image/png`, `application/manifest+json`).
+- Playwright visual regression: 0 console errors, 0 404s, all 9 routes
+  render correctly. Landing scrolls continuously through all 4529px
+  (no gaps, no clipping) — confirms v0.5.0 scroll fix still holds.
+- VLM UX audit: no critical bugs flagged; remaining suggestions are
+  feature requests (interactive map, calendar, FAQ) outside demo scope.
+
 ## [0.5.1] — 2026-06-19
 
 ### Summary

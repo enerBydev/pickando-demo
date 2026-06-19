@@ -1,4 +1,9 @@
 //! Mobile home — `/m`. Uber-style search + map + offer + drivers.
+//!
+//! UX improvements (v0.5.2):
+//! - Status pill at top ("3 conductores mirando")
+//! - Live indicator on offer counter
+//! - "4 DISPONIBLES" badge uses ink-on-paper contrast
 
 use dioxus::prelude::*;
 
@@ -7,17 +12,31 @@ use super::MobileTab;
 #[component]
 pub fn MobileHome() -> Element {
     rsx! {
+        // Status pill — explicit "live" indicator
+        div { class: "mobile-status-pill",
+            span { class: "mobile-status-pill-dot live" }
+            "Demo funcional · 6 rutas activas en CDMX"
+        }
+
         // Search card (Uber-style from/to)
         div { class: "mobile-search",
             div { class: "mobile-search-row",
                 div { class: "mobile-search-dot from" }
                 div { class: "mobile-search-text", "Av. Reforma 247, CDMX" }
-                div { class: "mobile-search-edit", "EDITAR" }
+                button {
+                    class: "mobile-search-edit",
+                    aria_label: "Editar origen",
+                    "EDITAR"
+                }
             }
             div { class: "mobile-search-row",
                 div { class: "mobile-search-dot to" }
                 div { class: "mobile-search-text muted", "¿Hacia dónde vas?" }
-                div { class: "mobile-search-edit", "+" }
+                button {
+                    class: "mobile-search-edit",
+                    aria_label: "Agregar destino",
+                    "+"
+                }
             }
         }
 
@@ -46,7 +65,7 @@ pub fn MobileHome() -> Element {
         div { class: "mobile-offer",
             div { class: "mobile-offer-row",
                 div { class: "mobile-offer-title", "Tu oferta" }
-                div { class: "mobile-offer-counter", "3 conductores mirando" }
+                div { class: "mobile-offer-counter live", "3 conductores mirando" }
             }
             div { style: "display:flex; align-items:baseline; gap:8px;",
                 span { class: "mobile-offer-price", "$32" }
@@ -67,7 +86,7 @@ pub fn MobileHome() -> Element {
         // Drivers head
         div { class: "mobile-drivers-head",
             div { class: "mobile-drivers-title", "Conductores cercanos" }
-            div { class: "mobile-drivers-count", "4 DISPONIBLES" }
+            div { class: "mobile-drivers-count new", "4 DISPONIBLES" }
         }
 
         // Driver list

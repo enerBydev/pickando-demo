@@ -1,0 +1,38 @@
+{
+  "name": "Nitheky — Same-Direction Local Mobility",
+  "short_name": "Nitheky",
+  "description": "Movilidad compartida en la misma dirección. Demo Rust + Dioxus + Axum.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAFA",
+  "theme_color": "#0A0A0A",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/assets/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/assets/favicon-32.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
+    {
+      "src": "/assets/favicon-16.png",
+      "type": "image/png",
+      "sizes": "16x16"
+    },
+    {
+      "src": "/assets/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180"
+    }
+  ],
+  "categories": [
+    "travel",
+    "transportation",
+    "productivity"
+  ]
+}

@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use pickando_shared::models::Route;
 
 use crate::api;
+use crate::icons::{IconAlert, IconCheck, IconInfo, IconX};
 
 /// Driver dashboard page.
 /// Connects to the backend via POST /api/v1/routes and shows live passenger
@@ -37,9 +38,11 @@ pub fn DriverPage() -> Element {
                 }
             }
 
-            // Demo transparency banner
+            // Demo transparency banner — uses SVG icon, not text glyph
             div { class: "demo-banner",
-                span { class: "demo-banner-icon", "i" }
+                span { class: "demo-banner-icon",
+                    IconInfo { size: 14 }
+                }
                 div {
                     strong { "Demo sin autenticación. " }
                     "Cualquier ruta que publiques es pública y visible para otros visitantes. \
@@ -50,12 +53,15 @@ pub fn DriverPage() -> Element {
             {if !success_msg().is_empty() {
                 rsx! {
                     div { class: "alert alert-success",
-                        span { class: "alert-icon", "✓" }
+                        span { class: "alert-icon",
+                            IconCheck { size: 14 }
+                        }
                         "{success_msg()}"
                         button {
                             class: "alert-close",
+                            aria_label: "Cerrar notificación",
                             onclick: move |_| success_msg.set(String::new()),
-                            "×"
+                            IconX { size: 16 }
                         }
                     }
                 }
@@ -66,12 +72,15 @@ pub fn DriverPage() -> Element {
             {if !error_msg().is_empty() {
                 rsx! {
                     div { class: "alert alert-error",
-                        span { class: "alert-icon", "!" }
+                        span { class: "alert-icon",
+                            IconAlert { size: 14 }
+                        }
                         "{error_msg()}"
                         button {
                             class: "alert-close",
+                            aria_label: "Cerrar error",
                             onclick: move |_| error_msg.set(String::new()),
-                            "×"
+                            IconX { size: 16 }
                         }
                     }
                 }
@@ -172,7 +181,14 @@ pub fn DriverPage() -> Element {
                         }
                         submitting.set(false);
                     },
-                    if submitting() { "Publicando..." } else { "Publicar Ruta" }
+                    {if submitting() {
+                        rsx! {
+                            span { class: "spinner" }
+                            "Publicando..."
+                        }
+                    } else {
+                        rsx! { "Publicar Ruta" }
+                    }}
                 }
             }
 

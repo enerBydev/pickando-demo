@@ -3,7 +3,7 @@ use pickando_shared::models::{MatchRequest, MatchResult, Route};
 use wasm_bindgen::JsCast;
 
 use crate::api;
-use crate::icons::{IconClock, IconList, IconPin, IconPulse, IconUser};
+use crate::icons::{IconAlert, IconClock, IconInfo, IconList, IconPin, IconPulse, IconUser, IconX};
 
 /// Passenger search page — the core matching feature demo.
 ///
@@ -52,9 +52,11 @@ pub fn PassengerPage() -> Element {
                 }
             }
 
-            // Demo transparency banner
+            // Demo transparency banner — uses SVG icon, not text glyph
             div { class: "demo-banner",
-                span { class: "demo-banner-icon", "i" }
+                span { class: "demo-banner-icon",
+                    IconInfo { size: 14 }
+                }
                 div {
                     strong { "Demo sin autenticación. " }
                     "Cualquier dato que ingreses es público y modificable por otros visitantes. \
@@ -90,17 +92,31 @@ pub fn PassengerPage() -> Element {
 
             {if !status_msg().is_empty() {
                 rsx! { div { class: "alert alert-info",
-                    span { class: "alert-icon", "i" }
+                    span { class: "alert-icon",
+                        IconInfo { size: 14 }
+                    }
                     "{status_msg()}"
-                    button { class: "alert-close", onclick: move |_| status_msg.set(String::new()), "×" }
+                    button {
+                        class: "alert-close",
+                        aria_label: "Cerrar notificación",
+                        onclick: move |_| status_msg.set(String::new()),
+                        IconX { size: 16 }
+                    }
                 }}
             } else { rsx! {} }}
 
             {if !error_msg().is_empty() {
                 rsx! { div { class: "alert alert-error",
-                    span { class: "alert-icon", "!" }
+                    span { class: "alert-icon",
+                        IconAlert { size: 14 }
+                    }
                     "{error_msg()}"
-                    button { class: "alert-close", onclick: move |_| error_msg.set(String::new()), "×" }
+                    button {
+                        class: "alert-close",
+                        aria_label: "Cerrar error",
+                        onclick: move |_| error_msg.set(String::new()),
+                        IconX { size: 16 }
+                    }
                 }}
             } else { rsx! {} }}
 
@@ -287,7 +303,14 @@ pub fn PassengerPage() -> Element {
                             }
                             loading.set(false);
                         },
-                        if loading() { "Buscando..." } else { "Buscar Matches" }
+                        {if loading() {
+                            rsx! {
+                                span { class: "spinner" }
+                                "Buscando..."
+                            }
+                        } else {
+                            rsx! { "Buscar Matches" }
+                        }}
                     }
 
                     if last_query_ms() > 0 {
@@ -424,7 +447,14 @@ pub fn PassengerPage() -> Element {
                             }
                             loading.set(false);
                         },
-                        if loading() { "Cargando..." } else { "Recargar rutas" }
+                        {if loading() {
+                            rsx! {
+                                span { class: "spinner" }
+                                "Cargando..."
+                            }
+                        } else {
+                            rsx! { "Recargar rutas" }
+                        }}
                     }
 
                     if !all_routes().is_empty() {
@@ -694,12 +724,21 @@ fn StatsPanel() -> Element {
                     }
                     loading.set(false);
                 },
-                if loading() { "Cargando..." } else { "Cargar métricas" }
+                {if loading() {
+                    rsx! {
+                        span { class: "spinner" }
+                        "Cargando..."
+                    }
+                } else {
+                    rsx! { "Cargar métricas" }
+                }}
             }
 
             {if !error().is_empty() {
                 rsx! { div { class: "alert alert-error",
-                    span { class: "alert-icon", "!" }
+                    span { class: "alert-icon",
+                        IconAlert { size: 14 }
+                    }
                     "{error()}"
                 }}
             } else { rsx! {} }}

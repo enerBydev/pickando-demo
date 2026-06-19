@@ -1162,6 +1162,23 @@ input, textarea, select { font-family: inherit; }
     gap: var(--space-6);
 }
 
+/* Card with accent — used to differentiate sections on About page */
+.card-accent {
+    position: relative;
+    padding-top: var(--space-7);
+}
+
+.card-accent::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: var(--space-6);
+    width: 36px;
+    height: 3px;
+    background: var(--de-gold);
+    border-radius: 0 0 2px 2px;
+}
+
 .page-header {
     display: flex;
     flex-direction: column;
@@ -1251,6 +1268,43 @@ input, textarea, select { font-family: inherit; }
 }
 
 .tab.active .tab-icon { opacity: 1; }
+
+/* --- Spinner (for loading states) --- */
+@keyframes nitheky-spin {
+    to { transform: rotate(360deg); }
+}
+
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: nitheky-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+.spinner-lg {
+    width: 18px;
+    height: 18px;
+    border-width: 2.5px;
+}
+
+.spinner-on-dark {
+    border-color: rgba(250, 250, 250, 0.35);
+    border-top-color: transparent;
+}
+
+/* Loading state for buttons */
+.btn-primary:disabled .spinner,
+.btn-primary .spinner {
+    color: var(--paper);
+}
+
+.btn-secondary .spinner {
+    color: var(--ink);
+}
 
 /* --- Inline icon helpers (used inside buttons, match cards, etc.) --- */
 .btn-icon {
@@ -1381,12 +1435,29 @@ input, textarea, select { font-family: inherit; }
     border: none;
     font-size: 1.2rem;
     color: currentColor;
-    opacity: 0.6;
-    padding: 0 4px;
+    opacity: 0.55;
+    padding: 4px 8px;
     line-height: 1;
+    border-radius: var(--radius-xs);
+    transition: opacity var(--transition), background var(--transition);
+    cursor: pointer;
+    min-width: 32px;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.alert-close:hover { opacity: 1; }
+.alert-close:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.alert-close:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    opacity: 1;
+}
 
 /* --- Cards --- */
 .card {
@@ -1982,6 +2053,37 @@ input, textarea, select { font-family: inherit; }
     padding-right: env(safe-area-inset-right);
 }
 
+/* --- Mobile status pill (top of every mobile page) --- */
+.mobile-status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    font-family: var(--font-mono);
+    align-self: stretch;
+    text-align: center;
+    justify-content: center;
+}
+
+.mobile-status-pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fog);
+    flex-shrink: 0;
+}
+
+.mobile-status-pill-dot.live {
+    background: var(--de-gold);
+    animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
 .mobile-header {
     background: var(--white);
     border-bottom: 1px solid var(--border);
@@ -2082,6 +2184,23 @@ input, textarea, select { font-family: inherit; }
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: 0.08em;
+    /* Touch target: min 44x44 per WCAG 2.5.5 — invisible padding via flex parent */
+    padding: 10px 12px;
+    margin: -10px -12px;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+}
+
+.mobile-search-edit:hover {
+    background: var(--mist);
+    color: var(--ink);
+}
+
+.mobile-search-edit:active {
+    background: var(--fog);
 }
 
 .mobile-map {
@@ -2125,6 +2244,27 @@ input, textarea, select { font-family: inherit; }
     font-size: 0.68rem;
     color: var(--de-gold-deep);
     font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mobile-offer-counter.live::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--de-gold);
+    animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+.mobile-offer-counter.sending::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--de-gold-deep);
+    animation: pulse-dot 0.8s ease-in-out infinite;
 }
 
 .mobile-offer-price {
@@ -2197,9 +2337,18 @@ input, textarea, select { font-family: inherit; }
 
 .mobile-drivers-count {
     font-size: 0.68rem;
-    color: var(--silver);
+    color: var(--ink);
     font-family: var(--font-mono);
-    font-weight: 600;
+    font-weight: 700;
+    background: var(--mist);
+    padding: 4px 8px;
+    border-radius: var(--radius-xs);
+    letter-spacing: 0.06em;
+}
+
+.mobile-drivers-count.new {
+    background: var(--ink);
+    color: var(--paper);
 }
 
 .mobile-driver {
@@ -2288,6 +2437,13 @@ input, textarea, select { font-family: inherit; }
 
 .mobile-cta:hover { background: var(--charcoal); }
 .mobile-cta:active { transform: translateY(1px); }
+.mobile-cta:disabled {
+    background: var(--fog);
+    color: var(--silver);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
 
 .mobile-nav {
     background: var(--white);

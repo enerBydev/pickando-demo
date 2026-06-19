@@ -4107,7 +4107,7 @@ dependencies = [
 
 [[package]]
 name = "pickando-backend"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "axum 0.8.9",
  "axum-test",
@@ -4127,7 +4127,7 @@ dependencies = [
 
 [[package]]
 name = "pickando-frontend"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "dioxus",
  "js-sys",
@@ -4142,7 +4142,7 @@ dependencies = [
 
 [[package]]
 name = "pickando-shared"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chrono",
  "criterion",

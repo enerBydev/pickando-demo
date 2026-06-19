@@ -12,7 +12,7 @@ pub fn AboutPage() -> Element {
                 }
             }
 
-            div { class: "card",
+            div { class: "card card-accent",
                 h2 { "¿Qué demuestra esta demo?" }
                 div { class: "demo-list",
                     div { class: "demo-item real",
@@ -88,7 +88,7 @@ pub fn AboutPage() -> Element {
                 }
             }
 
-            div { class: "card",
+            div { class: "card card-accent",
                 h2 { "¿Qué es placeholder?" }
                 div { class: "demo-list",
                     div { class: "demo-item placeholder",
@@ -129,7 +129,7 @@ pub fn AboutPage() -> Element {
                 }
             }
 
-            div { class: "card",
+            div { class: "card card-accent",
                 h2 { "Endpoints REST disponibles" }
                 table { class: "reuse-table",
                     thead {
@@ -153,7 +153,7 @@ pub fn AboutPage() -> Element {
                 }
             }
 
-            div { class: "card",
+            div { class: "card card-accent",
                 h2 { "Código Reutilizable vs Demo" }
                 p { class: "form-note",
                     "Todo el código está escrito para ser reutilizable en un proyecto productivo."
@@ -184,7 +184,7 @@ pub fn AboutPage() -> Element {
                 }
             }
 
-            div { class: "card",
+            div { class: "card card-accent",
                 h2 { "Calidad y garantías" }
                 ul { class: "quality-list",
                     li { "50+ tests automatizados (unit + property + integration)" }

@@ -1,20 +1,40 @@
 //! Mobile passenger — `/m/passenger`. Compact passenger flow.
+//!
+//! UX improvements (v0.5.2):
+//! - Live indicator (pulsing gold dot) on "Enviando…" status
+//! - Better visual hierarchy with status pill at top
+//! - Uses `mobile-drivers-count.new` accent for "CERCA" badge
+//! - Touch targets meet WCAG 2.5.5 (min 44x44 via .mobile-search-edit)
 
 use dioxus::prelude::*;
 
 #[component]
 pub fn MobilePassenger() -> Element {
     rsx! {
+        // Status pill — explicit "live" indicator at the top
+        div { class: "mobile-status-pill",
+            span { class: "mobile-status-pill-dot live" }
+            "Búsqueda en tiempo real · WS conectado"
+        }
+
         div { class: "mobile-search",
             div { class: "mobile-search-row",
                 div { class: "mobile-search-dot from" }
                 div { class: "mobile-search-text", "Mi ubicación actual" }
-                div { class: "mobile-search-edit", "CAMBIAR" }
+                button {
+                    class: "mobile-search-edit",
+                    aria_label: "Cambiar ubicación de origen",
+                    "CAMBIAR"
+                }
             }
             div { class: "mobile-search-row",
                 div { class: "mobile-search-dot to" }
                 div { class: "mobile-search-text muted", "Destino" }
-                div { class: "mobile-search-edit", "+" }
+                button {
+                    class: "mobile-search-edit",
+                    aria_label: "Agregar destino",
+                    "+"
+                }
             }
         }
 
@@ -34,7 +54,7 @@ pub fn MobilePassenger() -> Element {
         div { class: "mobile-offer",
             div { class: "mobile-offer-row",
                 div { class: "mobile-offer-title", "Tu oferta" }
-                div { class: "mobile-offer-counter", "Enviando…" }
+                div { class: "mobile-offer-counter sending", "Enviando…" }
             }
             div { style: "display:flex; align-items:baseline; gap:8px;",
                 span { class: "mobile-offer-price", "$32" }
@@ -45,7 +65,7 @@ pub fn MobilePassenger() -> Element {
 
         div { class: "mobile-drivers-head",
             div { class: "mobile-drivers-title", "Matches encontrados" }
-            div { class: "mobile-drivers-count", "3 CERCA" }
+            div { class: "mobile-drivers-count new", "3 CERCA" }
         }
 
         div { class: "mobile-driver",
@@ -84,7 +104,8 @@ pub fn MobilePassenger() -> Element {
             }
         }
 
-        button { class: "mobile-cta",
+        button {
+            class: "mobile-cta",
             "Confirmar $32 MXN"
             span { "→" }
         }

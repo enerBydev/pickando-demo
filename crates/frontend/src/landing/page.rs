@@ -319,7 +319,7 @@ pub fn LandingPage() -> Element {
                 div { class: "landing-footer-info",
                     h4 { "Demo" }
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.5.0 · Junio 2026 · Mono Elegance + DE-Gold" }
+                    p { class: "footer-version", "v0.5.2 · Junio 2026 · Mono Elegance + DE-Gold" }
                 }
             }
         }
