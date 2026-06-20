@@ -2145,8 +2145,26 @@ input, textarea, select { font-family: inherit; }
     align-items: center;
     justify-content: space-between;
     position: sticky;
-    top: 0;
+    top: env(safe-area-inset-top);
     z-index: 50;
+}
+
+/* Phone-width safe-area fallback for Android System WebView.
+   On Android System WebView, env(safe-area-inset-*) hardcodes to 0
+   (known limitation — the system status-bar height isn't exposed via
+   CSS). MainActivity sets SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN so the
+   WebView renders under the status bar, which crops the "Nitheky"
+   brand text on 412px viewports. Use max() with a 24px constant
+   fallback (typical Android status bar height) so the brand text is
+   visible. iOS Safari / Chrome Android respect env() natively, so
+   max() picks the larger value there. */
+@media (max-width: 600px) {
+    .mobile-shell {
+        padding-top: max(env(safe-area-inset-top), 24px);
+    }
+    .mobile-header {
+        top: max(env(safe-area-inset-top), 24px);
+    }
 }
 
 .mobile-logo {
