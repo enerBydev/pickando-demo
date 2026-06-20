@@ -70,12 +70,20 @@ async fn main() {
         .with_state(state.clone());
 
     // Static file server with SPA fallback.
-    // ServeDir::not_found_service makes any non-asset path return index.html,
-    // so the frontend router can handle deep links like /passenger or /driver.
+    //
+    // `ServeDir::fallback` (NOT `not_found_service`) is used so that the
+    // fallback's own status code is preserved. `ServeFile::new("static/index.html")`
+    // returns `200 OK` when the file exists, which is what we want for SPA deep
+    // links like `/m/`, `/app`, `/app/passenger`. Using `not_found_service` here
+    // would wrap the fallback with `SetStatus(NOT_FOUND)` and override the 200,
+    // causing the deployed app to return `404` for those routes (the body would
+    // still be `index.html`, so WebView renders fine, but HTTP crawlers/SEO
+    // tooling and Playwright-based monitoring would report 404). See worklog
+    // Task 8-c finding #1 and Task apk-audit-v0.5.3 row 8-11.
     let spa_fallback = ServeFile::new("static/index.html");
     let static_service = ServeDir::new("static")
         .append_index_html_on_directories(true)
-        .not_found_service(spa_fallback);
+        .fallback(spa_fallback);
 
     // CORS: restrict to known origins in production, permissive in dev.
     // In production, only the demo's own origin should be allowed to make
