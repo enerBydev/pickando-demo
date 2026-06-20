@@ -111,6 +111,14 @@ pub fn find_matching_routes(
 
 /// Variant of [`find_matching_routes`] that uses a full [`MatchRequest`]
 /// for richer direction and time matching.
+///
+/// Scoring weights: 0.5 distance + 0.3 direction + 0.2 time.
+///
+/// Direction weight (0.3) is intentionally moderate — for a demo, the
+/// distance dominates because passengers can adjust their pickup point
+/// by walking. For a production system where same-direction matters
+/// more (e.g., long-haul carpooling), increase to 0.4-0.5 and reduce
+/// distance to 0.3-0.4. Tune via A/B test against booking conversion.
 pub fn find_matching_routes_with_request(
     request: &MatchRequest,
     routes: &[Route],
