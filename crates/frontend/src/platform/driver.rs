@@ -27,7 +27,10 @@ pub fn DriverPage() -> Element {
         spawn(async move {
             match api::fetch_json::<Vec<Route>>("/api/v1/routes").await {
                 Ok(data) => my_routes.set(data),
-                Err(e) => error_msg.set(format!("No se pudieron cargar rutas: {e}")),
+                Err(e) => {
+                    api::log_err("cargar rutas", &e);
+                    error_msg.set("No pudimos completar la operación. Reintentar.".to_string());
+                }
             }
         });
     });
@@ -185,7 +188,10 @@ pub fn DriverPage() -> Element {
                                 }
                             }
                             Err(e) => {
-                                error_msg.set(format!("No se pudo publicar la ruta: {e}"));
+                                api::log_err("publicar ruta", &e);
+                                error_msg.set(
+                                    "No pudimos completar la operación. Reintentar.".to_string(),
+                                );
                             }
                         }
                         submitting.set(false);

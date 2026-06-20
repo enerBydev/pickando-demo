@@ -63,6 +63,16 @@ async fn read_response_text(resp: web_sys::Response) -> Result<String, String> {
         .ok_or_else(|| "response body is not a string".to_string())
 }
 
+/// Log an API error to the browser console for developer debugging.
+///
+/// Consumers should call this BEFORE replacing the user-facing message
+/// with a generic string, so the raw backend response body (which may
+/// contain a stack trace or internal error code) is preserved in the
+/// devtools console without being shown to the end user.
+pub fn log_err(context: &str, e: &str) {
+    web_sys::console::error_1(&wasm_bindgen::JsValue::from(format!("[api] {context}: {e}")));
+}
+
 /// Low-level fetch helper. Returns the web_sys::Response so callers can decide
 /// how to read the body.
 async fn fetch(url: &str, method: &str, body: Option<String>) -> Result<web_sys::Response, String> {
