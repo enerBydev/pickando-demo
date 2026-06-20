@@ -332,6 +332,17 @@ mod tests {
         assert!(ac <= ab + bc + 1e-6, "triangle inequality violated: ac={ac}, ab+bc={}", ab + bc);
     }
 
+    #[test]
+    fn haversine_cdmx_to_guadalajara_approx_460km() {
+        // Known Mexico-scale reference distance — documents the haversine
+        // correctness at the ~500 km range. CDMX Zócalo to Guadalajara
+        // Centro is ~460 km by road; great-circle is slightly shorter.
+        let cdmx = (19.4326, -99.1332);
+        let gdl = (20.6597, -103.3496);
+        let d = haversine_km(cdmx.0, cdmx.1, gdl.0, gdl.1);
+        assert!(d > 450.0 && d < 470.0, "CDMX→GDL should be ~460km, got {d}");
+    }
+
     // ----- find_matching_routes -----
 
     #[test]
