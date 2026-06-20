@@ -68,15 +68,12 @@ pub fn DriverPage() -> Element {
         selected_route_price_loading.set(true);
         spawn(async move {
             let url = format!("/api/v1/routes/{route_id}/price?seats_taken=1&multiplier=1.0");
-            match api::fetch_text(&url).await {
-                Ok(text) => {
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
-                        if let Some(p) = v.get("price_per_passenger_mxn").and_then(|x| x.as_f64()) {
-                            selected_route_price.set(Some(p));
-                        }
+            if let Ok(text) = api::fetch_text(&url).await {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if let Some(p) = v.get("price_per_passenger_mxn").and_then(|x| x.as_f64()) {
+                        selected_route_price.set(Some(p));
                     }
                 }
-                Err(_) => {}
             }
             selected_route_price_loading.set(false);
         });

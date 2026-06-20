@@ -130,7 +130,8 @@ impl AppState {
     /// Updates the user in place. Returns the new (avg, count) if the user exists.
     pub async fn recompute_user_rating(&self, user_id: &str) -> Option<(f64, u32)> {
         let ratings = self.ratings.read().await;
-        let target_ratings: Vec<&Rating> = ratings.iter().filter(|r| r.to_user_id == user_id).collect();
+        let target_ratings: Vec<&Rating> =
+            ratings.iter().filter(|r| r.to_user_id == user_id).collect();
         if target_ratings.is_empty() {
             // Just set rating_count = 0, avg = None
             let mut users = self.users.write().await;

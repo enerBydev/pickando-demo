@@ -50,13 +50,7 @@ async fn main() {
                     persisted.admin_logs,
                 )
             }
-            None => (
-                init_sample_routes(),
-                Vec::new(),
-                init_sample_users(),
-                Vec::new(),
-                Vec::new(),
-            ),
+            None => (init_sample_routes(), Vec::new(), init_sample_users(), Vec::new(), Vec::new()),
         };
 
     let state = Arc::new(AppState::new(initial_routes, start_time));
@@ -555,7 +549,12 @@ pub fn init_sample_users() -> Vec<User> {
 /// Make a log entry object for the admin log.
 /// Helper used by routes::admin_* handlers.
 #[allow(dead_code)]
-fn make_log(action: &str, admin_id: &str, target_id: Option<&str>, message: impl Into<String>) -> AdminLogEntry {
+fn make_log(
+    action: &str,
+    admin_id: &str,
+    target_id: Option<&str>,
+    message: impl Into<String>,
+) -> AdminLogEntry {
     AdminLogEntry {
         id: format!("log-{}", uuid::Uuid::new_v4().simple()),
         action: action.into(),

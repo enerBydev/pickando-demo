@@ -132,10 +132,9 @@ pub fn spawn_persistence_task(
 
         loop {
             interval.tick().await;
-            if let Err(e) = persist_state_once(
-                &path, &routes, &ride_requests, &users, &ratings, &admin_logs,
-            )
-            .await
+            if let Err(e) =
+                persist_state_once(&path, &routes, &ride_requests, &users, &ratings, &admin_logs)
+                    .await
             {
                 tracing::warn!("Persistence write failed: {e}");
             }

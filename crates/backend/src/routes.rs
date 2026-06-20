@@ -17,9 +17,9 @@ use pickando_shared::matching::{
 };
 use pickando_shared::models::{
     can_transition, compute_route_price_mxn, transition, transition_ride_request, AdminLogEntry,
-    AdminStats, ApproveDriverRequest, CreateRideRequest, CreateRatingRequest, CreateRouteRequest,
-    CreateUserRequest, HealthResponse, MatchRequest, Rating, RideRequest, RideRequestStatus,
-    Route, RouteStatus, StatsResponse, User, UserRole, WsMessage,
+    AdminStats, ApproveDriverRequest, CreateRatingRequest, CreateRideRequest, CreateRouteRequest,
+    CreateUserRequest, HealthResponse, MatchRequest, Rating, RideRequest, RideRequestStatus, Route,
+    RouteStatus, StatsResponse, User, UserRole, WsMessage,
 };
 use std::sync::Arc;
 
@@ -610,17 +610,19 @@ pub async fn start_route(
     let new_status = transition(route.status, RouteStatus::Started).map_err(|e| {
         (
             StatusCode::CONFLICT,
-            format!("Cannot start route {route_id}: {e} (current status: {})", route.status.label()),
+            format!(
+                "Cannot start route {route_id}: {e} (current status: {})",
+                route.status.label()
+            ),
         )
     })?;
     route.status = new_status;
     let route_clone = route.clone();
     drop(routes);
 
-    let _ = state.ws_broadcaster.send(WsMessage::text(
-        "route_started",
-        format!("Route {route_id} started"),
-    ));
+    let _ = state
+        .ws_broadcaster
+        .send(WsMessage::text("route_started", format!("Route {route_id} started")));
     Ok(Json(route_clone))
 }
 
@@ -643,7 +645,10 @@ pub async fn complete_route(
     let new_status = transition(route.status, RouteStatus::Completed).map_err(|e| {
         (
             StatusCode::CONFLICT,
-            format!("Cannot complete route {route_id}: {e} (current status: {})", route.status.label()),
+            format!(
+                "Cannot complete route {route_id}: {e} (current status: {})",
+                route.status.label()
+            ),
         )
     })?;
     route.status = new_status;
@@ -664,7 +669,9 @@ pub async fn complete_route(
         let ride_requests = state.ride_requests.read().await;
         let accepted_passenger_ids: Vec<String> = ride_requests
             .iter()
-            .filter(|rr| rr.route_id == route_id_for_passengers && rr.status == RideRequestStatus::Accepted)
+            .filter(|rr| {
+                rr.route_id == route_id_for_passengers && rr.status == RideRequestStatus::Accepted
+            })
             .map(|rr| rr.passenger_id.clone())
             .collect();
         drop(ride_requests);
@@ -758,7 +765,10 @@ pub async fn rate_route(
     let route_id = id.clone();
 
     if !value.is_object() {
-        return Err((StatusCode::UNPROCESSABLE_ENTITY, "request body must be a JSON object".into()));
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "request body must be a JSON object".into(),
+        ));
     }
     let body: CreateRatingRequest = serde_json::from_value(value).map_err(|e| {
         (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid CreateRatingRequest: {e}"))
@@ -768,7 +778,10 @@ pub async fn rate_route(
         return Err((StatusCode::BAD_REQUEST, "stars must be between 1 and 5".into()));
     }
     if body.from_user_id.trim().is_empty() || body.to_user_id.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "from_user_id and to_user_id must not be empty".into()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "from_user_id and to_user_id must not be empty".into(),
+        ));
     }
     if body.from_user_id == body.to_user_id {
         return Err((StatusCode::BAD_REQUEST, "cannot rate yourself".into()));
@@ -784,7 +797,10 @@ pub async fn rate_route(
         if route.status != RouteStatus::Completed {
             return Err((
                 StatusCode::CONFLICT,
-                format!("Route {route_id} is not completed (status: {}) — cannot rate", route.status.label()),
+                format!(
+                    "Route {route_id} is not completed (status: {}) — cannot rate",
+                    route.status.label()
+                ),
             ));
         }
     }
@@ -793,10 +809,16 @@ pub async fn rate_route(
     {
         let users = state.users.read().await;
         if !users.iter().any(|u| u.id == body.from_user_id) {
-            return Err((StatusCode::NOT_FOUND, format!("from_user_id {} not found", body.from_user_id)));
+            return Err((
+                StatusCode::NOT_FOUND,
+                format!("from_user_id {} not found", body.from_user_id),
+            ));
         }
         if !users.iter().any(|u| u.id == body.to_user_id) {
-            return Err((StatusCode::NOT_FOUND, format!("to_user_id {} not found", body.to_user_id)));
+            return Err((
+                StatusCode::NOT_FOUND,
+                format!("to_user_id {} not found", body.to_user_id),
+            ));
         }
     }
 
@@ -809,7 +831,10 @@ pub async fn rate_route(
                 && r.to_user_id == body.to_user_id
         });
         if dup {
-            return Err((StatusCode::CONFLICT, "rating already exists for this (route, from, to) tuple".into()));
+            return Err((
+                StatusCode::CONFLICT,
+                "rating already exists for this (route, from, to) tuple".into(),
+            ));
         }
     }
 
@@ -883,12 +908,7 @@ pub async fn accept_ride_request(
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("RideRequest {req_id} not found")))?;
 
     let new_status = transition_ride_request(req.status, RideRequestStatus::Accepted)
-        .map_err(|e| {
-            (
-                StatusCode::CONFLICT,
-                format!("Cannot accept ride request {req_id}: {e}"),
-            )
-        })?;
+        .map_err(|e| (StatusCode::CONFLICT, format!("Cannot accept ride request {req_id}: {e}")))?;
     req.status = new_status;
     let req_clone = req.clone();
     drop(ride_requests);
@@ -900,10 +920,10 @@ pub async fn accept_ride_request(
         let mut routes = state.routes.write().await;
         if let Some(route) = routes.iter_mut().find(|r| r.id == route_id) {
             route.seats_available = route.seats_available.saturating_sub(seats_taken);
-            if route.status == RouteStatus::Requested {
-                if can_transition(route.status, RouteStatus::Accepted) {
-                    route.status = RouteStatus::Accepted;
-                }
+            if route.status == RouteStatus::Requested
+                && can_transition(route.status, RouteStatus::Accepted)
+            {
+                route.status = RouteStatus::Accepted;
             }
         }
     }
@@ -934,12 +954,7 @@ pub async fn reject_ride_request(
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("RideRequest {req_id} not found")))?;
 
     let new_status = transition_ride_request(req.status, RideRequestStatus::Rejected)
-        .map_err(|e| {
-            (
-                StatusCode::CONFLICT,
-                format!("Cannot reject ride request {req_id}: {e}"),
-            )
-        })?;
+        .map_err(|e| (StatusCode::CONFLICT, format!("Cannot reject ride request {req_id}: {e}")))?;
     req.status = new_status;
     let req_clone = req.clone();
     drop(ride_requests);
@@ -951,7 +966,8 @@ pub async fn reject_ride_request(
         rrs.iter().any(|r| {
             r.id != req_id
                 && r.route_id == route_id
-                && (r.status == RideRequestStatus::Pending || r.status == RideRequestStatus::Accepted)
+                && (r.status == RideRequestStatus::Pending
+                    || r.status == RideRequestStatus::Accepted)
         })
     };
     if !other_active {
@@ -988,12 +1004,7 @@ pub async fn cancel_ride_request(
 
     let prev_status = req.status;
     let new_status = transition_ride_request(req.status, RideRequestStatus::Cancelled)
-        .map_err(|e| {
-            (
-                StatusCode::CONFLICT,
-                format!("Cannot cancel ride request {req_id}: {e}"),
-            )
-        })?;
+        .map_err(|e| (StatusCode::CONFLICT, format!("Cannot cancel ride request {req_id}: {e}")))?;
     req.status = new_status;
     let req_clone = req.clone();
     drop(ride_requests);
@@ -1048,7 +1059,10 @@ pub async fn create_user(
     state.record_request();
 
     if !value.is_object() {
-        return Err((StatusCode::UNPROCESSABLE_ENTITY, "request body must be a JSON object".into()));
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "request body must be a JSON object".into(),
+        ));
     }
     let body: CreateUserRequest = serde_json::from_value(value).map_err(|e| {
         (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid CreateUserRequest: {e}"))
@@ -1065,9 +1079,10 @@ pub async fn create_user(
     // (admin must approve before they can publish routes)
     let driver_profile = match body.role {
         UserRole::Driver => {
-            let dp = body
-                .driver_profile
-                .ok_or((StatusCode::BAD_REQUEST, "driver_profile is required for role=driver".to_string()))?;
+            let dp = body.driver_profile.ok_or((
+                StatusCode::BAD_REQUEST,
+                "driver_profile is required for role=driver".to_string(),
+            ))?;
             if dp.license_number.trim().is_empty()
                 || dp.vehicle_make.trim().is_empty()
                 || dp.vehicle_model.trim().is_empty()
@@ -1075,7 +1090,10 @@ pub async fn create_user(
                 || dp.vehicle_plate_partial.trim().is_empty()
                 || dp.habitual_zone.trim().is_empty()
             {
-                return Err((StatusCode::BAD_REQUEST, "all driver_profile fields are required".into()));
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "all driver_profile fields are required".into(),
+                ));
             }
             Some(dp)
         }
@@ -1085,8 +1103,14 @@ pub async fn create_user(
     // Check email uniqueness
     {
         let users = state.users.read().await;
-        if users.iter().any(|u| u.email.eq_ignore_ascii_case(&body.email)) {
-            return Err((StatusCode::CONFLICT, format!("email '{}' is already registered", body.email)));
+        if users
+            .iter()
+            .any(|u| u.email.eq_ignore_ascii_case(&body.email))
+        {
+            return Err((
+                StatusCode::CONFLICT,
+                format!("email '{}' is already registered", body.email),
+            ));
         }
     }
 
@@ -1147,26 +1171,43 @@ pub async fn admin_stats(State(state): State<Arc<AppState>>) -> Json<AdminStats>
 
     let users_total = users.len() as u32;
     let users_drivers = users.iter().filter(|u| u.role == UserRole::Driver).count() as u32;
-    let users_passengers = users.iter().filter(|u| u.role == UserRole::Passenger).count() as u32;
+    let users_passengers = users
+        .iter()
+        .filter(|u| u.role == UserRole::Passenger)
+        .count() as u32;
     let drivers_pending = users
         .iter()
         .filter(|u| {
             u.role == UserRole::Driver
-                && u.driver_profile.as_ref().map(|d| !d.approved).unwrap_or(false)
+                && u.driver_profile
+                    .as_ref()
+                    .map(|d| !d.approved)
+                    .unwrap_or(false)
         })
         .count() as u32;
     let drivers_approved = users
         .iter()
         .filter(|u| {
             u.role == UserRole::Driver
-                && u.driver_profile.as_ref().map(|d| d.approved).unwrap_or(false)
+                && u.driver_profile
+                    .as_ref()
+                    .map(|d| d.approved)
+                    .unwrap_or(false)
         })
         .count() as u32;
 
     let routes_total = routes.len() as u32;
     let routes_active = routes
         .iter()
-        .filter(|r| matches!(r.status, RouteStatus::Published | RouteStatus::Requested | RouteStatus::Accepted | RouteStatus::Started))
+        .filter(|r| {
+            matches!(
+                r.status,
+                RouteStatus::Published
+                    | RouteStatus::Requested
+                    | RouteStatus::Accepted
+                    | RouteStatus::Started
+            )
+        })
         .count() as u32;
     let routes_completed = routes
         .iter()
@@ -1248,7 +1289,9 @@ pub async fn admin_approve_driver(
     state.record_request();
     let user_id = id.clone();
 
-    let body: ApproveDriverRequest = if value.is_null() || value.is_object() && value.as_object().map(|o| o.is_empty()).unwrap_or(true) {
+    let body: ApproveDriverRequest = if value.is_null()
+        || value.is_object() && value.as_object().map(|o| o.is_empty()).unwrap_or(true)
+    {
         ApproveDriverRequest { approve: true }
     } else {
         serde_json::from_value(value).map_err(|e| {
@@ -1263,7 +1306,10 @@ pub async fn admin_approve_driver(
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("User {user_id} not found")))?;
 
     if user.role != UserRole::Driver {
-        return Err((StatusCode::BAD_REQUEST, format!("User {user_id} is not a driver (role: {})", user.role.label())));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("User {user_id} is not a driver (role: {})", user.role.label()),
+        ));
     }
 
     let now_ms = pickando_shared::models::now_ms();
@@ -1272,13 +1318,20 @@ pub async fn admin_approve_driver(
         dp.approved = approved;
         dp.approved_at_ms = if approved { Some(now_ms) } else { None };
     } else {
-        return Err((StatusCode::BAD_REQUEST, format!("User {user_id} has no driver_profile to approve")));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("User {user_id} has no driver_profile to approve"),
+        ));
     }
     let user_clone = user.clone();
     drop(users);
 
     // Log the action
-    let action = if approved { "driver_approved" } else { "driver_rejected" };
+    let action = if approved {
+        "driver_approved"
+    } else {
+        "driver_rejected"
+    };
     let msg = if approved {
         format!("Admin approved driver {}", user_clone.name)
     } else {
@@ -1967,12 +2020,9 @@ mod tests {
             comment: None,
             from_role: UserRole::Passenger,
         };
-        let result = rate_route(
-            State(state),
-            Path("r1".into()),
-            Json(serde_json::to_value(&body).unwrap()),
-        )
-        .await;
+        let result =
+            rate_route(State(state), Path("r1".into()), Json(serde_json::to_value(&body).unwrap()))
+                .await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().0, StatusCode::CONFLICT);
     }
@@ -2038,12 +2088,9 @@ mod tests {
             comment: None,
             from_role: UserRole::Passenger,
         };
-        let result = rate_route(
-            State(state),
-            Path("r1".into()),
-            Json(serde_json::to_value(&body).unwrap()),
-        )
-        .await;
+        let result =
+            rate_route(State(state), Path("r1".into()), Json(serde_json::to_value(&body).unwrap()))
+                .await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().0, StatusCode::BAD_REQUEST);
     }
@@ -2067,12 +2114,9 @@ mod tests {
             comment: None,
             from_role: UserRole::Passenger,
         };
-        let result = rate_route(
-            State(state),
-            Path("r1".into()),
-            Json(serde_json::to_value(&body).unwrap()),
-        )
-        .await;
+        let result =
+            rate_route(State(state), Path("r1".into()), Json(serde_json::to_value(&body).unwrap()))
+                .await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().0, StatusCode::BAD_REQUEST);
     }
@@ -2201,8 +2245,9 @@ mod tests {
             "email": "new@test.com",
             "role": "passenger",
         });
-        let (status, Json(user)) =
-            create_user(State(state.clone()), Json(body)).await.expect("should create");
+        let (status, Json(user)) = create_user(State(state.clone()), Json(body))
+            .await
+            .expect("should create");
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(user.name, "New User");
         assert_eq!(user.role, UserRole::Passenger);
@@ -2267,7 +2312,12 @@ mod tests {
         .await
         .expect("should approve");
         assert!(user.driver_profile.as_ref().unwrap().approved);
-        assert!(user.driver_profile.as_ref().unwrap().approved_at_ms.is_some());
+        assert!(user
+            .driver_profile
+            .as_ref()
+            .unwrap()
+            .approved_at_ms
+            .is_some());
 
         // Admin log entry should be recorded
         let logs = state.admin_logs.read().await;

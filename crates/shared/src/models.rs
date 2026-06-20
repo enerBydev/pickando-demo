@@ -521,11 +521,7 @@ pub fn transition(from: RouteStatus, to: RouteStatus) -> Result<RouteStatus, Str
     if can_transition(from, to) {
         Ok(to)
     } else {
-        Err(format!(
-            "illegal route transition: {} → {}",
-            from.label(),
-            to.label()
-        ))
+        Err(format!("illegal route transition: {} → {}", from.label(), to.label()))
     }
 }
 
@@ -540,17 +536,11 @@ pub fn transition(from: RouteStatus, to: RouteStatus) -> Result<RouteStatus, Str
 ///   Pending → Rejected
 ///   Pending → Cancelled  (passenger cancels)
 /// ```
-pub fn can_transition_ride_request(
-    from: RideRequestStatus,
-    to: RideRequestStatus,
-) -> bool {
+pub fn can_transition_ride_request(from: RideRequestStatus, to: RideRequestStatus) -> bool {
     use RideRequestStatus::*;
     matches!(
         (from, to),
-        (Pending, Accepted)
-            | (Pending, Rejected)
-            | (Pending, Cancelled)
-            | (Accepted, Cancelled)
+        (Pending, Accepted) | (Pending, Rejected) | (Pending, Cancelled) | (Accepted, Cancelled)
     )
 }
 
@@ -561,11 +551,7 @@ pub fn transition_ride_request(
     if can_transition_ride_request(from, to) {
         Ok(to)
     } else {
-        Err(format!(
-            "illegal ride_request transition: {} → {}",
-            from.label(),
-            to.label()
-        ))
+        Err(format!("illegal ride_request transition: {} → {}", from.label(), to.label()))
     }
 }
 
