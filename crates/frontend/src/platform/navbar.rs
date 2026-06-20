@@ -13,6 +13,7 @@ pub fn Navbar(active: PlatformTab) -> Element {
         ("Inicio", PlatformTab::Home),
         ("Pasajero", PlatformTab::Passenger),
         ("Conductor", PlatformTab::Driver),
+        ("Admin", PlatformTab::Admin),
         ("Acerca de", PlatformTab::About),
     ];
 

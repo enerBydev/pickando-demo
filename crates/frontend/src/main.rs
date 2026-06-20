@@ -64,6 +64,9 @@ enum Route {
     #[route("/app/driver")]
     PlatformDriver {},
 
+    #[route("/app/admin")]
+    PlatformAdmin {},
+
     #[route("/app/about")]
     PlatformAbout {},
 
@@ -137,6 +140,16 @@ fn PlatformDriver() -> Element {
         platform::PlatformShell {
             active: platform::PlatformTab::Driver,
             platform::DriverPage {}
+        }
+    }
+}
+
+#[component]
+fn PlatformAdmin() -> Element {
+    rsx! {
+        platform::PlatformShell {
+            active: platform::PlatformTab::Admin,
+            platform::AdminPage {}
         }
     }
 }

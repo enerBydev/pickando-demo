@@ -10,9 +10,11 @@
 //! - [`PlatformHome`] — dashboard cards
 //! - [`PassengerPage`] — matching engine demo
 //! - [`DriverPage`] — route publishing demo
+//! - [`AdminPage`] — admin dashboard (users, routes, logs, driver approval)
 //! - [`AboutPage`] — what's real vs placeholder
 
 mod about;
+mod admin;
 mod driver;
 mod footer;
 mod home;
@@ -21,6 +23,7 @@ mod passenger;
 mod shell;
 
 pub use about::AboutPage;
+pub use admin::AdminPage;
 pub use driver::DriverPage;
 pub use footer::Footer;
 pub use home::PlatformHome;

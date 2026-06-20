@@ -13,6 +13,7 @@ pickando-shared = { path = "../shared" }
 dioxus = { version = "0.7", features = ["router"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+futures = "0.3"
 
 # WebSocket + browser APIs for the live WS demo
 web-sys = { version = "0.3", features = [

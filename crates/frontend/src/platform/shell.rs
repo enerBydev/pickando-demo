@@ -14,6 +14,7 @@ pub enum PlatformTab {
     Home,
     Passenger,
     Driver,
+    Admin,
     About,
 }
 
@@ -38,6 +39,7 @@ impl PlatformTab {
             PlatformTab::Home => Route::PlatformHome {},
             PlatformTab::Passenger => Route::PlatformPassenger {},
             PlatformTab::Driver => Route::PlatformDriver {},
+            PlatformTab::Admin => Route::PlatformAdmin {},
             PlatformTab::About => Route::PlatformAbout {},
         }
     }

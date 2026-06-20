@@ -1,6 +1,6 @@
 use axum::{routing::get, routing::post, Router};
 use pickando_shared::matching::encode_geohash;
-use pickando_shared::models::Route;
+use pickando_shared::models::{AdminLogEntry, Route, User};
 use std::sync::Arc;
 use std::time::Instant;
 use tower_http::compression::CompressionLayer;
@@ -33,21 +33,62 @@ async fn main() {
 
     // Try to load persisted state from disk. If it exists, use it.
     // Otherwise, fall back to the seed routes.
-    let (initial_routes, initial_ride_requests) = match persistence::load_state().await {
-        Some(persisted) => (persisted.routes, persisted.ride_requests),
-        None => (init_sample_routes(), Vec::new()),
-    };
+    let (initial_routes, initial_ride_requests, initial_users, initial_ratings, initial_admin_logs) =
+        match persistence::load_state().await {
+            Some(persisted) => {
+                // If persisted file has no users (legacy v0.5 file), seed fresh
+                let users = if persisted.users.is_empty() {
+                    init_sample_users()
+                } else {
+                    persisted.users
+                };
+                (
+                    persisted.routes,
+                    persisted.ride_requests,
+                    users,
+                    persisted.ratings,
+                    persisted.admin_logs,
+                )
+            }
+            None => (
+                init_sample_routes(),
+                Vec::new(),
+                init_sample_users(),
+                Vec::new(),
+                Vec::new(),
+            ),
+        };
 
     let state = Arc::new(AppState::new(initial_routes, start_time));
 
-    // Pre-populate ride_requests if loaded from persistence
+    // Pre-populate ride_requests, users, ratings, admin_logs if loaded from persistence
     if !initial_ride_requests.is_empty() {
         let mut rr = state.ride_requests.write().await;
         *rr = initial_ride_requests;
     }
+    {
+        let mut users = state.users.write().await;
+        *users = initial_users;
+    }
+    {
+        let mut ratings = state.ratings.write().await;
+        *ratings = initial_ratings;
+    }
+    if !initial_admin_logs.is_empty() {
+        let mut logs = state.admin_logs.write().await;
+        for entry in initial_admin_logs {
+            logs.push_back(entry);
+        }
+    }
 
     // Spawn the background persistence task (writes state to disk every 30s)
-    persistence::spawn_persistence_task(state.routes.clone(), state.ride_requests.clone());
+    persistence::spawn_persistence_task(
+        state.routes.clone(),
+        state.ride_requests.clone(),
+        state.users.clone(),
+        state.ratings.clone(),
+        state.admin_logs.clone(),
+    );
 
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
@@ -62,7 +103,23 @@ async fn main() {
         .route("/api/v1/routes/{id}", get(routes::get_route))
         .route("/api/v1/routes/{id}", axum::routing::delete(routes::cancel_route))
         .route("/api/v1/routes/{id}/request", post(routes::request_ride))
+        .route("/api/v1/routes/{id}/start", post(routes::start_route))
+        .route("/api/v1/routes/{id}/complete", post(routes::complete_route))
+        .route("/api/v1/routes/{id}/price", post(routes::compute_price))
+        .route("/api/v1/routes/{id}/rate", post(routes::rate_route))
         .route("/api/v1/match", post(routes::find_matches))
+        .route("/api/v1/ride-requests/{id}/accept", post(routes::accept_ride_request))
+        .route("/api/v1/ride-requests/{id}/reject", post(routes::reject_ride_request))
+        .route("/api/v1/ride-requests/{id}/cancel", post(routes::cancel_ride_request))
+        .route("/api/v1/ride-requests/{id}", get(routes::get_ride_request))
+        .route("/api/v1/users", get(routes::list_users).post(routes::create_user))
+        .route("/api/v1/users/{id}", get(routes::get_user))
+        .route("/api/v1/ratings", get(routes::list_ratings))
+        .route("/api/v1/admin/stats", get(routes::admin_stats))
+        .route("/api/v1/admin/logs", get(routes::admin_logs))
+        .route("/api/v1/admin/users", get(routes::admin_list_users))
+        .route("/api/v1/admin/routes", get(routes::admin_list_routes))
+        .route("/api/v1/admin/drivers/{id}/approve", post(routes::admin_approve_driver))
         .route("/api/v1/demo-reset", post(routes::demo_reset))
         .route("/ws", get(ws::ws_handler))
         .with_state(state.clone());
@@ -222,8 +279,15 @@ async fn main() {
     // without it. (SRE audit 8-c P0 fix.)
     tracing::info!("Flushing final state to disk before exit…");
     let persist_path = persistence::persistence_path();
-    if let Err(e) =
-        persistence::persist_state_once(&persist_path, &state.routes, &state.ride_requests).await
+    if let Err(e) = persistence::persist_state_once(
+        &persist_path,
+        &state.routes,
+        &state.ride_requests,
+        &state.users,
+        &state.ratings,
+        &state.admin_logs,
+    )
+    .await
     {
         tracing::warn!("Final persistence flush failed: {e}");
     } else {
@@ -309,7 +373,7 @@ pub fn init_sample_routes() -> Vec<Route> {
         .enumerate()
         .map(|(i, (o_lat, o_lng, d_lat, d_lng, o_addr, d_addr, dep, seats))| Route {
             id: format!("route-{:03}", i + 1),
-            driver_id: format!("driver-{:03}", i + 1),
+            driver_id: format!("user-driver-{:03}", i + 1),
             origin_lat: o_lat,
             origin_lng: o_lng,
             dest_lat: d_lat,
@@ -323,6 +387,183 @@ pub fn init_sample_routes() -> Vec<Route> {
             created_at_ms: now_ms,
         })
         .collect()
+}
+
+/// Initialize sample users — 4 drivers + 4 passengers + 1 admin.
+/// Drivers are pre-approved for demo convenience.
+/// All have verified=true to skip the OTP flow in the demo.
+pub fn init_sample_users() -> Vec<User> {
+    use pickando_shared::models::{DriverProfile, UserRole};
+    let now_ms = pickando_shared::models::now_ms();
+    vec![
+        User {
+            id: "user-driver-001".into(),
+            name: "Carlos Ramírez".into(),
+            email: "carlos@pickando.demo".into(),
+            phone: Some("55-1234-5678".into()),
+            role: UserRole::Driver,
+            verified: true,
+            driver_profile: Some(DriverProfile {
+                license_number: "LIC-CDMX-001".into(),
+                vehicle_make: "Toyota".into(),
+                vehicle_model: "Corolla 2021".into(),
+                vehicle_color: "Silver".into(),
+                vehicle_plate_partial: "ABC".into(),
+                habitual_zone: "Zócalo, CDMX".into(),
+                approved: true,
+                approved_at_ms: Some(now_ms),
+            }),
+            rating_avg: Some(4.8),
+            rating_count: 12,
+            rides_completed: 47,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-driver-002".into(),
+            name: "Laura González".into(),
+            email: "laura@pickando.demo".into(),
+            phone: Some("55-2345-6789".into()),
+            role: UserRole::Driver,
+            verified: true,
+            driver_profile: Some(DriverProfile {
+                license_number: "LIC-CDMX-002".into(),
+                vehicle_make: "Honda".into(),
+                vehicle_model: "Civic 2022".into(),
+                vehicle_color: "Black".into(),
+                vehicle_plate_partial: "XYZ".into(),
+                habitual_zone: "Alameda, CDMX".into(),
+                approved: true,
+                approved_at_ms: Some(now_ms),
+            }),
+            rating_avg: Some(4.9),
+            rating_count: 28,
+            rides_completed: 103,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-driver-003".into(),
+            name: "Miguel Torres".into(),
+            email: "miguel@pickando.demo".into(),
+            phone: Some("55-3456-7890".into()),
+            role: UserRole::Driver,
+            verified: true,
+            driver_profile: Some(DriverProfile {
+                license_number: "LIC-CDMX-003".into(),
+                vehicle_make: "Nissan".into(),
+                vehicle_model: "Versa 2020".into(),
+                vehicle_color: "White".into(),
+                vehicle_plate_partial: "DEF".into(),
+                habitual_zone: "Reforma, CDMX".into(),
+                approved: true,
+                approved_at_ms: Some(now_ms),
+            }),
+            rating_avg: Some(4.6),
+            rating_count: 8,
+            rides_completed: 31,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-driver-004".into(),
+            name: "Ana Martínez".into(),
+            email: "ana@pickando.demo".into(),
+            phone: Some("81-4567-8901".into()),
+            role: UserRole::Driver,
+            verified: true,
+            driver_profile: Some(DriverProfile {
+                license_number: "LIC-MTY-004".into(),
+                vehicle_make: "Mazda".into(),
+                vehicle_model: "3 2023".into(),
+                vehicle_color: "Red".into(),
+                vehicle_plate_partial: "GHI".into(),
+                habitual_zone: "Monterrey Centro".into(),
+                approved: true,
+                approved_at_ms: Some(now_ms),
+            }),
+            rating_avg: Some(4.7),
+            rating_count: 15,
+            rides_completed: 52,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-passenger-001".into(),
+            name: "Sofía López".into(),
+            email: "sofia@pickando.demo".into(),
+            phone: Some("55-5678-9012".into()),
+            role: UserRole::Passenger,
+            verified: true,
+            driver_profile: None,
+            rating_avg: Some(4.9),
+            rating_count: 22,
+            rides_completed: 35,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-passenger-002".into(),
+            name: "Diego Hernández".into(),
+            email: "diego@pickando.demo".into(),
+            phone: Some("55-6789-0123".into()),
+            role: UserRole::Passenger,
+            verified: true,
+            driver_profile: None,
+            rating_avg: Some(4.5),
+            rating_count: 9,
+            rides_completed: 14,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-passenger-003".into(),
+            name: "Valeria Castro".into(),
+            email: "valeria@pickando.demo".into(),
+            phone: Some("55-7890-1234".into()),
+            role: UserRole::Passenger,
+            verified: true,
+            driver_profile: None,
+            rating_avg: Some(5.0),
+            rating_count: 4,
+            rides_completed: 4,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-passenger-004".into(),
+            name: "Andrés Ruiz".into(),
+            email: "andres@pickando.demo".into(),
+            phone: Some("81-8901-2345".into()),
+            role: UserRole::Passenger,
+            verified: true,
+            driver_profile: None,
+            rating_avg: None,
+            rating_count: 0,
+            rides_completed: 0,
+            created_at_ms: now_ms,
+        },
+        User {
+            id: "user-admin-001".into(),
+            name: "Admin Nitheky".into(),
+            email: "admin@pickando.demo".into(),
+            phone: None,
+            role: UserRole::Admin,
+            verified: true,
+            driver_profile: None,
+            rating_avg: None,
+            rating_count: 0,
+            rides_completed: 0,
+            created_at_ms: now_ms,
+        },
+    ]
+}
+
+/// Make a log entry object for the admin log.
+/// Helper used by routes::admin_* handlers.
+#[allow(dead_code)]
+fn make_log(action: &str, admin_id: &str, target_id: Option<&str>, message: impl Into<String>) -> AdminLogEntry {
+    AdminLogEntry {
+        id: format!("log-{}", uuid::Uuid::new_v4().simple()),
+        action: action.into(),
+        admin_id: admin_id.into(),
+        target_id: target_id.map(|s| s.into()),
+        message: message.into(),
+        created_at_ms: pickando_shared::models::now_ms(),
+    }
 }
 
 // ===========================================================================

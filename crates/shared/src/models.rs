@@ -314,7 +314,7 @@ pub struct CreateRideRequest {
 }
 
 // ===========================================================================
-// Users (minimal — auth is out of scope for the demo)
+// Users (demo — auth is out of scope, but we model the user lifecycle)
 // ===========================================================================
 
 /// User of the platform — can be a driver, passenger, or admin.
@@ -323,8 +323,21 @@ pub struct User {
     pub id: String,
     pub name: String,
     pub email: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phone: Option<String>,
     pub role: UserRole,
     pub verified: bool,
+    /// Driver-specific data (None for passengers/admins).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub driver_profile: Option<DriverProfile>,
+    /// Average rating (1-5 stars). None until first rating.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rating_avg: Option<f64>,
+    /// Number of ratings received.
+    pub rating_count: u32,
+    /// Total rides completed (as driver OR passenger).
+    pub rides_completed: u32,
+    pub created_at_ms: u64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -333,6 +346,263 @@ pub enum UserRole {
     Passenger,
     Driver,
     Admin,
+}
+
+impl UserRole {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Passenger => "Pasajero",
+            Self::Driver => "Conductor",
+            Self::Admin => "Admin",
+        }
+    }
+}
+
+/// Driver-specific profile data attached to a User.
+///
+/// Required for a user to publish routes. The admin must approve
+/// a driver profile before it becomes active.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriverProfile {
+    /// License number (last 4 digits visible publicly, full stored).
+    pub license_number: String,
+    /// Vehicle make + model, e.g. "Toyota Corolla 2021".
+    pub vehicle_make: String,
+    pub vehicle_model: String,
+    pub vehicle_color: String,
+    /// Partial plate (last 3 chars), e.g. "XYZ".
+    pub vehicle_plate_partial: String,
+    /// Approximate habitual zone, e.g. "CDMX, Polanco".
+    pub habitual_zone: String,
+    /// Whether the admin has approved this driver.
+    pub approved: bool,
+    pub approved_at_ms: Option<u64>,
+}
+
+/// Request body for `POST /api/v1/users` (signup).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateUserRequest {
+    pub name: String,
+    pub email: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phone: Option<String>,
+    pub role: UserRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_profile: Option<DriverProfile>,
+}
+
+/// Request body for `POST /api/v1/admin/drivers/{id}/approve`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ApproveDriverRequest {
+    /// Defaults to true. Set to false to reject.
+    #[serde(default = "default_true")]
+    pub approve: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+// ===========================================================================
+// Ratings (mutual post-ride rating between driver and passenger)
+// ===========================================================================
+
+/// A rating left by one user for another after a completed ride.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Rating {
+    pub id: String,
+    /// The ride (route) this rating is associated with.
+    pub route_id: String,
+    /// User who left the rating.
+    pub from_user_id: String,
+    /// User who received the rating.
+    pub to_user_id: String,
+    /// 1-5 stars.
+    pub stars: u8,
+    /// Optional written comment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// Role of the rater at time of rating (for filtering/stats).
+    pub from_role: UserRole,
+    pub created_at_ms: u64,
+}
+
+/// Request body for `POST /api/v1/routes/{id}/rate`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateRatingRequest {
+    pub from_user_id: String,
+    pub to_user_id: String,
+    /// 1-5 inclusive.
+    pub stars: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// "driver" or "passenger" — who is rating whom.
+    pub from_role: UserRole,
+}
+
+// ===========================================================================
+// Pricing (demo — per-km contribution)
+// ===========================================================================
+
+/// Compute the passenger contribution for a route based on its length.
+///
+/// Demo pricing model (MXN):
+///   - Base fare: MX$ 5
+///   - Per-km rate: MX$ 2.50
+///   - Cap: MX$ 80 (so long routes don't overcharge)
+///   - Discount for extra passengers (split): 10% per additional seat
+///
+/// The driver sets a `price_multiplier` per route (default 1.0) to allow
+/// slight adjustments. Capped at [0.5, 2.0] for demo safety.
+pub fn compute_route_price_mxn(
+    route_length_km: f64,
+    seats_taken: u32,
+    price_multiplier: f64,
+) -> f64 {
+    let base = 5.0;
+    let per_km = 2.5;
+    let cap = 80.0;
+
+    let raw = base + per_km * route_length_km.max(0.0);
+    let capped = raw.min(cap);
+
+    let multiplier = price_multiplier.clamp(0.5, 2.0);
+    let per_seat = capped * multiplier;
+
+    // Split: total fare is shared among seats_taken passengers.
+    // Each passenger pays per_seat / max(seats_taken, 1).
+    let split_factor = if seats_taken > 0 {
+        1.0 / seats_taken as f64
+    } else {
+        1.0
+    };
+    // Apply a 10% discount per additional seat (encourages group rides)
+    let group_discount = if seats_taken >= 2 {
+        0.10 * (seats_taken - 1) as f64
+    } else {
+        0.0
+    };
+    let final_price = per_seat * split_factor * (1.0 - group_discount.min(0.5));
+
+    (final_price * 100.0).round() / 100.0
+}
+
+// ===========================================================================
+// Route lifecycle transitions (type-state-like — encoded as functions)
+// ===========================================================================
+
+/// Legal transitions of the Route status state machine.
+///
+/// ```text
+///   Published → Requested → Accepted → Started → Completed
+///                  ↓           ↓
+///               Cancelled   Cancelled
+/// ```
+///
+/// `Cancelled` and `Completed` are terminal — no transitions out.
+pub fn can_transition(from: RouteStatus, to: RouteStatus) -> bool {
+    use RouteStatus::*;
+    matches!(
+        (from, to),
+        (Published, Requested)
+            | (Requested, Accepted)
+            | (Requested, Cancelled)
+            | (Accepted, Started)
+            | (Accepted, Cancelled)
+            | (Started, Completed)
+    )
+}
+
+/// Apply a transition, returning an error message if illegal.
+pub fn transition(from: RouteStatus, to: RouteStatus) -> Result<RouteStatus, String> {
+    if can_transition(from, to) {
+        Ok(to)
+    } else {
+        Err(format!(
+            "illegal route transition: {} → {}",
+            from.label(),
+            to.label()
+        ))
+    }
+}
+
+// ===========================================================================
+// Ride request lifecycle transitions
+// ===========================================================================
+
+/// Legal transitions of RideRequest status.
+///
+/// ```text
+///   Pending → Accepted → (route completes via Started→Completed)
+///   Pending → Rejected
+///   Pending → Cancelled  (passenger cancels)
+/// ```
+pub fn can_transition_ride_request(
+    from: RideRequestStatus,
+    to: RideRequestStatus,
+) -> bool {
+    use RideRequestStatus::*;
+    matches!(
+        (from, to),
+        (Pending, Accepted)
+            | (Pending, Rejected)
+            | (Pending, Cancelled)
+            | (Accepted, Cancelled)
+    )
+}
+
+pub fn transition_ride_request(
+    from: RideRequestStatus,
+    to: RideRequestStatus,
+) -> Result<RideRequestStatus, String> {
+    if can_transition_ride_request(from, to) {
+        Ok(to)
+    } else {
+        Err(format!(
+            "illegal ride_request transition: {} → {}",
+            from.label(),
+            to.label()
+        ))
+    }
+}
+
+// ===========================================================================
+// Admin actions
+// ===========================================================================
+
+/// Admin log entry — for the panel admin to track critical actions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminLogEntry {
+    pub id: String,
+    pub action: String,
+    /// Who performed the action.
+    pub admin_id: String,
+    /// Target user/route id (if applicable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_id: Option<String>,
+    pub message: String,
+    pub created_at_ms: u64,
+}
+
+/// Admin stats — broader than `/stats` because it includes user metrics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminStats {
+    pub users_total: u32,
+    pub users_drivers: u32,
+    pub users_passengers: u32,
+    pub drivers_pending_approval: u32,
+    pub drivers_approved: u32,
+    pub routes_total: u32,
+    pub routes_active: u32,
+    pub routes_completed: u32,
+    pub rides_total: u32,
+    pub ratings_total: u32,
+    pub avg_driver_rating: Option<f64>,
+    pub avg_passenger_rating: Option<f64>,
+    pub uptime_seconds: f64,
 }
 
 // ===========================================================================
@@ -770,5 +1040,217 @@ mod tests {
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("route_created"));
         assert!(json.contains("route-001"));
+    }
+
+    // ========================================================================
+    // Lifecycle transition tests
+    // ========================================================================
+
+    #[test]
+    fn legal_transitions_are_allowed() {
+        use RouteStatus::*;
+        assert!(can_transition(Published, Requested));
+        assert!(can_transition(Requested, Accepted));
+        assert!(can_transition(Requested, Cancelled));
+        assert!(can_transition(Accepted, Started));
+        assert!(can_transition(Accepted, Cancelled));
+        assert!(can_transition(Started, Completed));
+    }
+
+    #[test]
+    fn illegal_transitions_are_rejected() {
+        use RouteStatus::*;
+        // Skip states
+        assert!(!can_transition(Published, Accepted));
+        assert!(!can_transition(Published, Started));
+        assert!(!can_transition(Published, Completed));
+        // From terminal states
+        assert!(!can_transition(Cancelled, Published));
+        assert!(!can_transition(Completed, Published));
+        assert!(!can_transition(Completed, Cancelled));
+        // Backwards
+        assert!(!can_transition(Accepted, Requested));
+        assert!(!can_transition(Started, Accepted));
+    }
+
+    #[test]
+    fn transition_returns_new_status_on_legal() {
+        let new = transition(RouteStatus::Published, RouteStatus::Requested);
+        assert_eq!(new.unwrap(), RouteStatus::Requested);
+    }
+
+    #[test]
+    fn transition_returns_err_on_illegal() {
+        let result = transition(RouteStatus::Published, RouteStatus::Started);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("illegal"));
+    }
+
+    #[test]
+    fn ride_request_legal_transitions() {
+        use RideRequestStatus::*;
+        assert!(can_transition_ride_request(Pending, Accepted));
+        assert!(can_transition_ride_request(Pending, Rejected));
+        assert!(can_transition_ride_request(Pending, Cancelled));
+        assert!(can_transition_ride_request(Accepted, Cancelled));
+    }
+
+    #[test]
+    fn ride_request_illegal_transitions() {
+        use RideRequestStatus::*;
+        assert!(!can_transition_ride_request(Accepted, Pending));
+        assert!(!can_transition_ride_request(Rejected, Accepted));
+        assert!(!can_transition_ride_request(Cancelled, Pending));
+        assert!(!can_transition_ride_request(Pending, Pending));
+    }
+
+    // ========================================================================
+    // Pricing tests
+    // ========================================================================
+
+    #[test]
+    fn pricing_zero_km_returns_base_fare() {
+        let price = compute_route_price_mxn(0.0, 1, 1.0);
+        // base 5.0 + per_km 2.5 * 0 = 5.0; multiplier 1.0; no discount
+        // split_factor 1/1 = 1.0; group_discount 0; final = 5.0
+        assert!((price - 5.0).abs() < 0.01, "expected 5.0, got {price}");
+    }
+
+    #[test]
+    fn pricing_ten_km_single_passenger() {
+        // base 5 + 2.5 * 10 = 30; * 1.0 = 30; / 1 = 30; no discount; → 30.00
+        let price = compute_route_price_mxn(10.0, 1, 1.0);
+        assert!((price - 30.0).abs() < 0.01, "expected 30.0, got {price}");
+    }
+
+    #[test]
+    fn pricing_capped_at_80() {
+        // 100 km → 5 + 250 = 255, capped to 80
+        let price = compute_route_price_mxn(100.0, 1, 1.0);
+        assert!((price - 80.0).abs() < 0.01, "expected 80.0, got {price}");
+    }
+
+    #[test]
+    fn pricing_split_between_two_passengers() {
+        // 10 km → 30 total. With 2 passengers: split_factor = 0.5, discount = 10%
+        // per_passenger = 30 * 0.5 * (1 - 0.10) = 13.5
+        let price = compute_route_price_mxn(10.0, 2, 1.0);
+        assert!((price - 13.5).abs() < 0.01, "expected 13.5, got {price}");
+    }
+
+    #[test]
+    fn pricing_split_between_three_passengers() {
+        // 10 km → 30 total. 3 passengers: split 1/3, discount = 2 * 10% = 20%
+        // per_passenger = 30 * (1/3) * (1 - 0.20) = 8.0
+        let price = compute_route_price_mxn(10.0, 3, 1.0);
+        assert!((price - 8.0).abs() < 0.01, "expected 8.0, got {price}");
+    }
+
+    #[test]
+    fn pricing_multiplier_2x_doubles_within_cap() {
+        // 10 km → 30 base; multiplier 2.0 → 60; single passenger
+        let price = compute_route_price_mxn(10.0, 1, 2.0);
+        assert!((price - 60.0).abs() < 0.01, "expected 60.0, got {price}");
+    }
+
+    #[test]
+    fn pricing_multiplier_clamped_at_2x() {
+        // Even if someone passes 5.0, clamped to 2.0
+        let price = compute_route_price_mxn(10.0, 1, 5.0);
+        assert!((price - 60.0).abs() < 0.01, "expected 60.0 (clamped), got {price}");
+    }
+
+    #[test]
+    fn pricing_multiplier_clamped_at_0_5x() {
+        // Multiplier 0.1 → clamped to 0.5; 30 * 0.5 = 15
+        let price = compute_route_price_mxn(10.0, 1, 0.1);
+        assert!((price - 15.0).abs() < 0.01, "expected 15.0 (clamped), got {price}");
+    }
+
+    #[test]
+    fn pricing_zero_seats_returns_full_fare_safely() {
+        // seats_taken = 0 → split_factor = 1.0 (safe fallback, no divide-by-zero)
+        let price = compute_route_price_mxn(10.0, 0, 1.0);
+        assert!((price - 30.0).abs() < 0.01, "expected 30.0, got {price}");
+    }
+
+    #[test]
+    fn pricing_negative_km_treated_as_zero() {
+        // Defensive: clamp negative km to 0
+        let price = compute_route_price_mxn(-5.0, 1, 1.0);
+        assert!((price - 5.0).abs() < 0.01, "expected 5.0 (base fare), got {price}");
+    }
+
+    // ========================================================================
+    // User model tests
+    // ========================================================================
+
+    #[test]
+    fn user_role_label_spanish() {
+        assert_eq!(UserRole::Passenger.label(), "Pasajero");
+        assert_eq!(UserRole::Driver.label(), "Conductor");
+        assert_eq!(UserRole::Admin.label(), "Admin");
+    }
+
+    #[test]
+    fn user_serializes_with_optional_fields_skipped() {
+        let user = User {
+            id: "u1".into(),
+            name: "Test".into(),
+            email: "t@t.com".into(),
+            phone: None,
+            role: UserRole::Passenger,
+            verified: false,
+            driver_profile: None,
+            rating_avg: None,
+            rating_count: 0,
+            rides_completed: 0,
+            created_at_ms: 0,
+        };
+        let json = serde_json::to_string(&user).unwrap();
+        // The skip_serializing_if attribute means None-valued Option fields
+        // should NOT appear in the JSON output at all.
+        // Check the JSON parses back to a serde_json::Value and verify those keys
+        // are absent.
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let obj = v.as_object().expect("user serializes to a JSON object");
+        assert!(!obj.contains_key("phone"), "phone should be skipped");
+        assert!(!obj.contains_key("driver_profile"), "driver_profile should be skipped");
+        assert!(!obj.contains_key("rating_avg"), "rating_avg should be skipped");
+        // But required fields should be present
+        assert_eq!(obj.get("name").and_then(|v| v.as_str()), Some("Test"));
+        assert_eq!(obj.get("role").and_then(|v| v.as_str()), Some("passenger"));
+    }
+
+    #[test]
+    fn user_serializes_with_driver_profile_included() {
+        let profile = DriverProfile {
+            license_number: "LIC123".into(),
+            vehicle_make: "Toyota".into(),
+            vehicle_model: "Corolla".into(),
+            vehicle_color: "Silver".into(),
+            vehicle_plate_partial: "XYZ".into(),
+            habitual_zone: "CDMX".into(),
+            approved: true,
+            approved_at_ms: Some(0),
+        };
+        let user = User {
+            id: "u1".into(),
+            name: "Test".into(),
+            email: "t@t.com".into(),
+            phone: Some("555-1234".into()),
+            role: UserRole::Driver,
+            verified: true,
+            driver_profile: Some(profile),
+            rating_avg: Some(4.5),
+            rating_count: 10,
+            rides_completed: 5,
+            created_at_ms: 0,
+        };
+        let json = serde_json::to_string(&user).unwrap();
+        assert!(json.contains("driver_profile"));
+        assert!(json.contains("vehicle_make"));
+        assert!(json.contains("rating_avg"));
+        assert!(json.contains("555-1234"));
     }
 }
