@@ -19,6 +19,8 @@ pub fn DriverPage() -> Element {
     let mut error_msg = use_signal(String::new);
     let mut success_msg = use_signal(String::new);
     let mut my_routes = use_signal(Vec::<Route>::new);
+    let mut accepted_request = use_signal(|| std::collections::HashSet::<&'static str>::new());
+    let mut rejected_request = use_signal(|| std::collections::HashSet::<&'static str>::new());
 
     // Auto-load my routes on mount
     use_effect(move || {
@@ -250,22 +252,68 @@ pub fn DriverPage() -> Element {
                                 div { class: "request-avatar", "M" }
                                 div { class: "request-info",
                                     span { class: "request-name", "María G." }
-                                    span { class: "request-detail", "Solicita 1 asiento · a 0.4 km de tu origen" }
+                                    span { class: "request-detail",
+                                        if accepted_request().contains("maria") {
+                                            "✓ Aceptada — simulación demo"
+                                        } else if rejected_request().contains("maria") {
+                                            "✗ Rechazada — simulación demo"
+                                        } else {
+                                            "Solicita 1 asiento · a 0.4 km de tu origen"
+                                        }
+                                    }
                                 }
                                 div { class: "request-actions",
-                                    button { class: "btn-sm btn-primary", "Aceptar" }
-                                    button { class: "btn-sm btn-secondary", "Rechazar" }
+                                    button {
+                                        class: "btn-sm btn-primary",
+                                        disabled: accepted_request().contains("maria") || rejected_request().contains("maria"),
+                                        onclick: move |_| {
+                                            accepted_request.write().insert("maria");
+                                            success_msg.set("Solicitud de María aceptada (demo — el pasajero sería notificado en producción).".to_string());
+                                        },
+                                        "Aceptar"
+                                    }
+                                    button {
+                                        class: "btn-sm btn-secondary",
+                                        disabled: accepted_request().contains("maria") || rejected_request().contains("maria"),
+                                        onclick: move |_| {
+                                            rejected_request.write().insert("maria");
+                                        },
+                                        "Rechazar"
+                                    }
                                 }
                             }
                             div { class: "request-item",
                                 div { class: "request-avatar", "J" }
                                 div { class: "request-info",
                                     span { class: "request-name", "Javier L." }
-                                    span { class: "request-detail", "Solicita 2 asientos · a 0.8 km de tu origen" }
+                                    span { class: "request-detail",
+                                        if accepted_request().contains("javier") {
+                                            "✓ Aceptada — simulación demo"
+                                        } else if rejected_request().contains("javier") {
+                                            "✗ Rechazada — simulación demo"
+                                        } else {
+                                            "Solicita 2 asientos · a 0.8 km de tu origen"
+                                        }
+                                    }
                                 }
                                 div { class: "request-actions",
-                                    button { class: "btn-sm btn-primary", "Aceptar" }
-                                    button { class: "btn-sm btn-secondary", "Rechazar" }
+                                    button {
+                                        class: "btn-sm btn-primary",
+                                        disabled: accepted_request().contains("javier") || rejected_request().contains("javier"),
+                                        onclick: move |_| {
+                                            accepted_request.write().insert("javier");
+                                            success_msg.set("Solicitud de Javier aceptada (demo — el pasajero sería notificado en producción).".to_string());
+                                        },
+                                        "Aceptar"
+                                    }
+                                    button {
+                                        class: "btn-sm btn-secondary",
+                                        disabled: accepted_request().contains("javier") || rejected_request().contains("javier"),
+                                        onclick: move |_| {
+                                            rejected_request.write().insert("javier");
+                                        },
+                                        "Rechazar"
+                                    }
                                 }
                             }
                         }

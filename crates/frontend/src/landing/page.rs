@@ -89,7 +89,7 @@ pub fn LandingPage() -> Element {
                     span { class: "highlight", "mismo camino" }
                 }
                 p { class: "hero-subtitle",
-                    "Conduce o comparte. Sin desvíos, sin esperas, sin Uber. \
+                    "Conduce o comparte. Sin desvíos, sin esperas, sin intermediarios. \
                     Conecta con personas que ya van en tu misma dirección, \
                     comparte el costo y reduce tu huella."
                 }
@@ -106,7 +106,7 @@ pub fn LandingPage() -> Element {
                     span { class: "hero-trust-dot" }
                     span { "Sin costo" }
                     span { class: "hero-trust-dot" }
-                    span { "Ahorra hasta 70% vs Uber" }
+                    span { "Ahorra hasta 70% vs apps de transporte" }
                     span { class: "hero-trust-dot" }
                     span { "Reduce tu huella de CO₂" }
                 }
@@ -116,7 +116,7 @@ pub fn LandingPage() -> Element {
         // ===== Stats bar =====
         section { class: "landing-stats", id: "stats",
             div { class: "landing-stats-inner",
-                div { class: "stat", span { class: "stat-number", "70%" }, span { class: "stat-label", "ahorro vs Uber" } }
+                div { class: "stat", span { class: "stat-number", "70%" }, span { class: "stat-label", "ahorro estimado vs apps de transporte*" } }
                 div { class: "stat-divider" }
                 div { class: "stat", span { class: "stat-number", "2.3 t" }, span { class: "stat-label", "CO₂ evitado/año*" } }
                 div { class: "stat-divider" }
@@ -319,7 +319,7 @@ pub fn LandingPage() -> Element {
                 div { class: "landing-footer-info",
                     h4 { "Demo" }
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.5.3 · Junio 2026 · Mono Elegance + DE-Gold" }
+                    p { class: "footer-version", "v0.5.5 · Junio 2026 · Mono Elegance + DE-Gold" }
                 }
             }
         }

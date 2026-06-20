@@ -81,18 +81,17 @@ pub fn find_matching_routes(
     routes: &[Route],
     radius_km: f64,
 ) -> Vec<MatchResult> {
-    let passenger_geo = encode_geohash(passenger_lat, passenger_lng, 6);
+    // NOTE: The geohash pre-filter was removed because it produced false negatives
+    // at cell boundaries (a route 839 m away could share only 3 geohash chars and
+    // be silently dropped). For the demo's route count (10-100), a full haversine
+    // scan is <100 µs, so the geohash pre-filter provides no measurable performance
+    // benefit while compromising correctness. The two-layer design is preserved in
+    // the geohash column of each Route for future neighbor-expansion optimization.
 
     let mut matches: Vec<MatchResult> = routes
         .iter()
         .filter(|r| r.is_bookable())
         .filter_map(|route| {
-            let proximity = geohash_proximity(&passenger_geo, &route.geohash);
-
-            if proximity > radius_km {
-                return None;
-            }
-
             let distance =
                 haversine_km(passenger_lat, passenger_lng, route.origin_lat, route.origin_lng);
 
@@ -136,8 +135,7 @@ pub fn find_matching_routes_with_request(
     let req = request.clone().sanitized();
     let radius = req.radius_km.unwrap_or(5.0);
 
-    let passenger_geo = encode_geohash(req.lat, req.lng, 6);
-
+    // NOTE: geohash pre-filter removed — see find_matching_routes() doc comment.
     let passenger_departure_ms = req
         .passenger_departure_time
         .as_deref()
@@ -149,11 +147,6 @@ pub fn find_matching_routes_with_request(
         .iter()
         .filter(|r| r.is_bookable())
         .filter_map(|route| {
-            let proximity = geohash_proximity(&passenger_geo, &route.geohash);
-            if proximity > radius {
-                return None;
-            }
-
             let distance = haversine_km(req.lat, req.lng, route.origin_lat, route.origin_lng);
             if distance > radius {
                 return None;
@@ -274,6 +267,7 @@ fn round_to(v: f64, places: u32) -> f64 {
 /// - 4 chars shared ≈ 20 km
 /// - 3 chars shared ≈ 156 km
 /// - < 3 chars = too far for local mobility
+#[allow(dead_code)]
 fn geohash_proximity(geo1: &str, geo2: &str) -> f64 {
     let common_prefix = geo1
         .chars()

@@ -67,7 +67,7 @@ pub fn MobilePassenger() -> Element {
         div { class: "mobile-status-pill",
             span { class: "mobile-status-pill-dot live" }
             {match phase() {
-                PassengerPhase::Selecting => "Búsqueda en tiempo real · WS conectado".to_string(),
+                PassengerPhase::Selecting => "Demo · datos simulados en tiempo real".to_string(),
                 PassengerPhase::Sending   => "Enviando solicitud a conductores…".to_string(),
                 PassengerPhase::Confirmed => "¡Viaje confirmado! Conductor en camino".to_string(),
             }}

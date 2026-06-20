@@ -46,7 +46,7 @@ pub fn MobileShell(active: MobileTab, children: Element) -> Element {
                 Link { to: Route::MobileHome {},
                     div { class: "mobile-logo", "Nitheky" }
                 }
-                div { class: "mobile-avatar", "RM" }
+                div { class: "mobile-avatar", "DE" }
             }
 
             // Body

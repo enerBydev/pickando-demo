@@ -61,7 +61,7 @@ pub fn AboutPage() -> Element {
                         span { class: "demo-status real", "✓" }
                         div {
                             h4 { "Telemetría en vivo" }
-                            p { "GET /api/v1/stats: rutas por estado, solicitudes por estado, uptime, requests servidos. /health incluye uso de memoria RSS y versión." }
+                            p { "GET /api/v1/stats: rutas por estado, solicitudes por estado, uptime, requests servidos. GET /api/v1/health incluye uso de memoria RSS y versión." }
                         }
                     }
                     div { class: "demo-item real",

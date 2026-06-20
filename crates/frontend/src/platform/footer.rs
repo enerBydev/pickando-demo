@@ -25,7 +25,7 @@ pub fn Footer() -> Element {
                 div { class: "footer-info",
                     h4 { "Demo" }
                     p { "Demo funcional — sin costo, sin compromiso" }
-                    p { class: "footer-version", "v0.5.3 — Junio 2026 — Mono Elegance + DE-Gold" }
+                    p { class: "footer-version", "v0.5.5 — Junio 2026 — Mono Elegance + DE-Gold" }
                 }
             }
         }

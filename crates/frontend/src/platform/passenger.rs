@@ -30,6 +30,7 @@ pub fn PassengerPage() -> Element {
     let mut status_msg = use_signal(String::new);
     let mut error_msg = use_signal(String::new);
     let mut last_query_ms = use_signal(|| 0u128);
+    let mut has_searched = use_signal(|| false);
 
     // Auto-load all routes on mount so the page feels alive
     use_effect(move || {
@@ -237,6 +238,7 @@ pub fn PassengerPage() -> Element {
                         disabled: loading(),
                         onclick: move |_| async move {
                             loading.set(true);
+                            has_searched.set(true);
                             error_msg.set(String::new());
 
                             // Validate input explicitly — never silently fall back to
@@ -476,8 +478,13 @@ pub fn PassengerPage() -> Element {
                         }
                     } else if !loading() {
                         div { class: "empty-state",
-                            p { "Ingresa coordenadas y busca rutas compatibles" }
-                            p { class: "hint", "Prueba: 19.4326, -99.1332 con radio 5km — debería encontrar varias rutas en CDMX" }
+                            if has_searched() {
+                                p { "No se encontraron rutas dentro del radio solicitado." }
+                                p { class: "hint", "Prueba con un radio mayor (ej. 10 km) o coordenadas distintas." }
+                            } else {
+                                p { "Ingresa coordenadas y busca rutas compatibles" }
+                                p { class: "hint", "Prueba: 19.4326, -99.1332 con radio 5km — debería encontrar varias rutas en CDMX" }
+                            }
                         }
                     }
                 }

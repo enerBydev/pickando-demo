@@ -84,13 +84,28 @@ RUN mkdir -p /app/target/dx/pickando-frontend/release/web/public/assets && \
     cp /app/crates/frontend/assets/favicon.svg \
        /app/target/dx/pickando-frontend/release/web/public/assets/favicon.svg && \
     cp /app/crates/frontend/assets/watchdog.js \
-       /app/target/dx/pickando-frontend/release/web/public/assets/watchdog.js
+       /app/target/dx/pickando-frontend/release/web/public/assets/watchdog.js && \
+    cp /app/crates/frontend/assets/favicon-16.png \
+       /app/target/dx/pickando-frontend/release/web/public/assets/favicon-16.png && \
+    cp /app/crates/frontend/assets/favicon-32.png \
+       /app/target/dx/pickando-frontend/release/web/public/assets/favicon-32.png && \
+    cp /app/crates/frontend/assets/apple-touch-icon.png \
+       /app/target/dx/pickando-frontend/release/web/public/assets/apple-touch-icon.png && \
+    cp /app/crates/frontend/assets/og-image.png \
+       /app/target/dx/pickando-frontend/release/web/public/assets/og-image.png && \
+    cp /app/crates/frontend/assets/site.webmanifest \
+       /app/target/dx/pickando-frontend/release/web/public/assets/site.webmanifest
 
 # Verify the expected output files exist — fail loudly if missing
 RUN test -f /app/target/dx/pickando-frontend/release/web/public/index.html && \
     test -f /app/target/dx/pickando-frontend/release/web/public/assets/main.css && \
     test -f /app/target/dx/pickando-frontend/release/web/public/assets/watchdog.js && \
-    echo "[OK] index.html + main.css + watchdog.js present" && \
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/favicon-16.png && \
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/favicon-32.png && \
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/apple-touch-icon.png && \
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/og-image.png && \
+    test -f /app/target/dx/pickando-frontend/release/web/public/assets/site.webmanifest && \
+    echo "[OK] index.html + all 8 assets present" && \
     ls -la /app/target/dx/pickando-frontend/release/web/public/ && \
     ls -la /app/target/dx/pickando-frontend/release/web/public/assets/
 
