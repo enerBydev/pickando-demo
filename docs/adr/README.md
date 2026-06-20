@@ -70,3 +70,10 @@ superseded.
 | 0004 | [Android: WebView wrapper instead of native Dioxus mobile build](0004-android-webview-wrapper.md) | Accepted | 2026-06-15 |
 | 0005 | [WebSocket protocol: typed JSON envelope vs binary](0005-ws-typed-json-envelope.md) | Accepted | 2026-06-17 |
 | 0006 | [Geohash + Haversine for the matching engine](0006-geohash-haversine-matching.md) | Accepted | 2026-06-13 |
+| 0007 | [Request body validation strategy (deny_unknown_fields + is_object + field checks)](0007-request-body-validation-strategy.md) | Accepted | 2026-06-17 |
+| 0008 | [CORS + security headers strategy](0008-cors-and-security-headers.md) | Accepted | 2026-06-17 |
+| 0009 | [Demo reset endpoint (public, unauthenticated)](0009-demo-reset-endpoint.md) | Accepted | 2026-06-17 |
+| 0010 | [UI/UX redesign — storytelling and human-centered copy](0010-ui-ux-redesign-storytelling.md) | Accepted | 2026-06-17 |
+| 0011 | [Release APK signing — RSA 4096 non-debug cert + CI post-build verification](0011-release-apk-signing-and-ci-verification.md) | Accepted | 2026-06-20 |
+| 0012 | [Strict Content-Security-Policy with `wasm-unsafe-eval`](0012-strict-csp-wasm-unsafe-eval.md) | Accepted | 2026-06-19 |
+| 0013 | [Graceful shutdown + persistence fsync](0013-graceful-shutdown-and-fsync.md) | Accepted | 2026-06-19 |

@@ -71,6 +71,7 @@ fn build_cors_layer() -> CorsLayer {
 **Deferred.** HSTS tells the browser to always use HTTPS for the site. While important
 for production, it requires HTTPS detection logic to avoid breaking local dev servers
 that run on HTTP. Will be added in a future version with proper environment detection.
+*(See the "Update — v0.5.4" section below — HSTS was added in commit `aa74764`.)*
 
 ## Consecuencias
 
@@ -84,7 +85,7 @@ that run on HTTP. Will be added in a future version with proper environment dete
 ### Negativas
 - Dev mode requires `PICKANDO_DEV=1` env var for localhost CORS.
 - Production requires updating the allowed origins list if the domain changes.
-- HSTS not yet set (deferred).
+- HSTS not yet set (deferred). *(Resolved in v0.5.4 — see Update below.)*
 
 ### Neutrales
 - `tower-http` `set-header` feature added to workspace Cargo.toml.
@@ -102,6 +103,72 @@ version of Pickando. The current policy disables only the most risky ones.
 
 ### C: Use a middleware crate like `tower_http::auth::RequireAuthorizationLayer`
 Rejected: overkill for a demo without authentication. CORS + headers is sufficient.
+
+## Update — v0.5.4 (commits aa74764 + 968e88a, 2026-06-19): HSTS + strict CSP
+
+The HSTS note above was written before the security audit closure
+(commits `aa74764` and `968e88a`). As of v0.5.4, **both HSTS and a
+strict Content-Security-Policy are live in production**. They are
+installed as additional `SetResponseHeaderLayer::if_not_present`
+instances in `crates/backend/src/main.rs`, stacked alongside the four
+headers from the original Decision section.
+
+### HSTS (Strict-Transport-Security)
+
+```http
+Strict-Transport-Security: max-age=31536000
+```
+
+Set unconditionally on every response (HTTP and HTTPS alike). Browsers
+**ignore** HSTS over plain HTTP, so the dev server (`cargo run` on
+`http://localhost:3000`) is unaffected; production (HTTPS on Railway)
+gets the 1-year HSTS pin. `includeSubDomains` is intentionally omitted
+because the `*.railway.app` subdomain is shared with other Railway
+apps — we cannot guarantee they are all HTTPS-ready.
+
+### Content-Security-Policy
+
+```http
+Content-Security-Policy: default-src 'self'; \
+  script-src 'self' 'wasm-unsafe-eval'; \
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+  font-src 'self' https://fonts.gstatic.com data:; \
+  img-src 'self' data: https:; \
+  connect-src 'self' ws: wss:; \
+  frame-ancestors 'none'; \
+  base-uri 'self'; \
+  form-action 'self'
+```
+
+Directive-by-directive rationale:
+
+| Directive        | Value                                                                  | Why                                                                                          |
+|------------------|------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| `default-src`    | `'self'`                                                               | Deny-by-default baseline; every other directive overrides for its resource type.             |
+| `script-src`     | `'self' 'wasm-unsafe-eval'`                                            | Same-origin scripts only. `'wasm-unsafe-eval'` is the W3C-recommended (CSP3) narrowly-scoped directive that **only** permits WebAssembly compile/instantiate — **not** general `eval()` or `Function()`. Required for Dioxus to mount its WASM bundle. See ADR-0012. |
+| `style-src`      | `'self' 'unsafe-inline' https://fonts.googleapis.com`                  | Dioxus injects inline `style="..."` attributes on elements (`'unsafe-inline'`); Google Fonts CSS for Inter + JetBrains Mono. |
+| `font-src`       | `'self' https://fonts.gstatic.com data:`                               | Self-hosted + Google Fonts file CDN + inline SVG `data:` URIs.                               |
+| `img-src`        | `'self' data: https:`                                                  | Self-hosted + inline `data:` URIs + arbitrary HTTPS images (e.g. avatar URLs).               |
+| `connect-src`    | `'self' ws: wss:`                                                       | REST same-origin + WebSocket (`ws://` and `wss://`).                                          |
+| `frame-ancestors`| `'none'`                                                               | Clickjacking hard-block — equivalent to `X-Frame-Options: DENY` but with CSP semantics.      |
+| `base-uri`       | `'self'`                                                               | Blocks `<base>` injection.                                                                    |
+| `form-action`    | `'self'`                                                               | Blocks form submission to off-site URLs.                                                     |
+
+Verified live with `curl -I https://pickando-demo-production.up.railway.app/api/v1/health`:
+all six security headers (`x-content-type-options`, `x-frame-options`,
+`referrer-policy`, `permissions-policy`, `content-security-policy`,
+`strict-transport-security`) are present.
+
+### Why `wasm-unsafe-eval` and not `unsafe-eval`
+
+`unsafe-eval` would unlock `eval()`, `Function()`, and
+`setTimeout("string")` — a much larger XSS surface. Dioxus does not use
+any of those. The only thing Dioxus needs is `WebAssembly.compile()`
+and `WebAssembly.instantiate()`, which CSP3 gates behind the
+narrower `'wasm-unsafe-eval'` keyword. This is the same directive the
+W3C spec authors added specifically for the WASM use case; it has been
+supported by Chrome, Firefox, and Safari since 2022. See ADR-0012 for
+the full rationale.
 
 ## Referencias
 

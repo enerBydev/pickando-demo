@@ -199,12 +199,22 @@ export to Datadog/Jaeger via OpenTelemetry.
 | Threat                      | Mitigation                                       |
 |-----------------------------|--------------------------------------------------|
 | SQL injection               | N/A — no SQL (in-memory)                         |
-| XSS                         | Dioxus escapes all interpolated values           |
+| XSS                         | Dioxus escapes all interpolated values + strict CSP (`script-src 'self' 'wasm-unsafe-eval'` — see ADR-0012) |
 | CSRF                        | N/A — no auth                                    |
-| DOS                         | `tower::limit` (planned for production)          |
+| DOS                         | `DefaultBodyLimit::max(64 * 1024)` (see ADR-0007 §Layer 5); `tower::limit` planned for production |
 | Supply-chain                | `cargo audit` + `cargo deny` in CI               |
 | Memory safety               | Rust's borrow checker (no `unsafe` in workspace) |
 | Secrets in repo             | None — `/.secrets` is gitignored                 |
+| SSL strip                   | `Strict-Transport-Security: max-age=31536000` (see ADR-0012) |
+| Clickjacking                | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` |
+| MIME sniffing               | `X-Content-Type-Options: nosniff`                |
+| Buffer-exhaustion DoS       | `DefaultBodyLimit::max(64 KB)` on all routes     |
+| State loss on redeploy      | Graceful shutdown + final `fsync` flush (see ADR-0013) |
+| Debug-signed APK rejected   | RSA 4096 non-debug cert + CI post-build verification (see ADR-0011) |
+
+See ADR-0007 (validation), ADR-0008 (CORS + headers), ADR-0011 (APK
+signing), ADR-0012 (CSP + HSTS), and ADR-0013 (graceful shutdown) for
+the full rationale of each mitigation.
 
 ## Performance characteristics
 

@@ -86,6 +86,53 @@ relevance = 1.0 / (distance_km + 1.0)
 Distance-weighted inverse — closer routes score higher. Direction and time
 scores will be combined as a weighted average in v0.2.
 
+## Update — v0.5.4 (2026-06-20): relevance formula and weights in production
+
+The original Step 4 placeholder (`relevance = 1.0 / (distance_km + 1.0)`)
+was the v0.1 heuristic. The shipped implementation in
+`crates/shared/src/matching.rs::compute_relevance` (verified against
+production source) is a **weighted blend of three normalized signals**:
+
+```
+relevance = 0.5 · distance_score + 0.3 · direction_score + 0.2 · time_score
+```
+
+Where each component is normalized into `[0, 1]`:
+
+- **`distance_score = 1.0 - (distance_km / radius_km).clamp(0.0, 1.0)`**
+  — full mark at the origin, linear decay to zero at the search-radius
+  boundary.
+- **`direction_score = ((direction_similarity + 1.0) / 2.0).clamp(0.0, 1.0)`**
+  — converts the `[-1, 1]` cosine-of-bearings similarity into `[0, 1]`
+  (1 = same direction, 0.5 = perpendicular, 0 = opposite).
+- **`time_score = time_compatibility.clamp(0.0, 1.0)`**
+  — 1.0 when the route's departure time falls inside the passenger's
+  requested time window; ramps down to 0.0 outside the window. When no
+  `passenger_departure_time` is provided, routes with unknown times get
+  a neutral 0.5.
+
+The weights (`0.5 / 0.3 / 0.2`) reflect the priority order documented in
+the original Context section: distance is the most important (a far
+route simply doesn't match), direction is next (same-direction is the
+core differentiator vs. taxi dispatch), and time is the most flexible
+(commute windows are typically wide enough to absorb small offsets).
+
+The score is rounded to 3 decimal places before being serialized in
+`MatchResult`, and `find_matching_routes` sorts the result vector by
+`relevance_score` descending. The `recent_relevance_scores` ring buffer
+in `AppState` (capacity 100) feeds the `avg_relevance_score` field on
+`/api/v1/stats`, which the demo uses as a live "matching quality" signal.
+
+### Property-based tests
+
+`proptest` verifies the relevance-score invariants:
+- `relevance ∈ [0.0, 1.0]` for all combinations of inputs (including
+  negative/zero/NaN-distance edge cases).
+- Haversine is symmetric: `haversine(a, b) == haversine(b, a)`.
+- Identical inputs produce `0.0` distance.
+- North-bound routes match north-bound passengers with higher relevance
+  than south-bound routes at the same distance.
+
 ## Alternatives Considered
 
 ### PostGIS `ST_DWithin` + `ST_Distance`

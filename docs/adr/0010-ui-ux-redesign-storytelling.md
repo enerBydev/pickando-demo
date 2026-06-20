@@ -151,3 +151,88 @@ improvement over v0.2.1 and sufficient for Helder's evaluation.
 - `crates/frontend/src/components/landing.rs` — redesigned landing page
 - `crates/frontend/assets/main.css` — new CSS for storytelling section
 - Nielsen Norman Group: <https://www.nngroup.com/articles/minute-video-test/>
+
+## Update — v0.5.0 (commit 30e147a, 2026-06-19): rebranding a Nitheky + paleta Mono Elegance / DE-Gold
+
+La v0.5.0 introdujo un **rebranding completo** del producto demo:
+**Pickando → Nitheky**, con un sistema de diseño bautizado **"Mono
+Elegance + DE-Gold"** (design system #09). Esto se aplicó **sobre** la
+redesign de storytelling de la v0.2.1 documentada arriba — no la
+reemplazó, la elevó con una identidad visual coherente.
+
+### Identidad de marca — Nitheky
+
+El nombre "Nitheky" sustituye a "Pickando" en todas las superficies de
+usuario visibles (loading screen, navbar, footer, metadata del
+AndroidManifest, launcher icon). El logo es la letra **"N"** blanca
+sobre fondo ink (`#0A0A0A`) con un punto gold (`#C9A961`) como acento
+— el mismo motivo que se replicó en PNG para todas las densidades de
+launcher icon en la v0.5.4 (ver ADR-0004).
+
+### Paleta — Mono Elegance + DE-Gold
+
+| Token              | Hex       | Uso                                              |
+|--------------------|-----------|--------------------------------------------------|
+| `--ink`            | `#0A0A0A` | Fondo principal, texto de alto contraste inverso |
+| `--paper`          | `#FAFAFA` | Fondo de superficies, texto sobre ink            |
+| `--gold`           | `#C9A961` | Acento DE-Gold (oro alemán): CTAs, highlights    |
+| `--gold-soft`      | `#E8D9A6` | Fondos de badges, hovers suaves                  |
+| `--mist`           | `#F0F0F0` | Fondos de cards, divisores                       |
+
+Contraste ink-on-paper: **19.2:1** — cumple WCAG AAA. La paleta
+**monocroma suiza** (ink + paper) es la base; el **oro alemán** es el
+único acento cromático, reservado para CTAs y datos clave (precios,
+status, métricas). Esto elimina el ruido visual de paletas
+multi-color y refuerza la lectura del storytelling.
+
+### Inspiraciones fusionadas
+
+- **GBM** (ahora Charles Schwab México) — grilla y densidad de
+  información.
+- **Uber** — densidad de CTA y jerarquía visual.
+- **inDrive** — modelo de oferta del pasajero.
+
+### Tipografía
+
+- **Inter** para display y body (variable, optimizada para pantalla).
+- **JetBrains Mono** para datos numéricos (precios, IDs, timestamps).
+- Escala tipográfica base 4px, ratio 1.2; radii base 1.5.
+
+### Arquitectura de rutas — Landing / Platform / Mobile
+
+El rebrand vino acompañado de una **separación estricta** vía Dioxus
+Router:
+
+| Ruta      | Área     | Descripción                                              |
+|-----------|----------|----------------------------------------------------------|
+| `/`       | Landing  | Marketing público, sin chrome de app                    |
+| `/app/*`  | Platform | App web, navbar + footer, optimizada para desktop        |
+| `/m/*`    | Mobile   | Optimizada para Android WebView, bottom-nav, safe-area   |
+
+Cada área es un módulo Rust separado (`landing/`, `platform/`,
+`mobile/`). El `Route` enum deriva `Routable` — type-safe, elimina
+Stringly-typed routing. El APK de Android carga `/m/` en lugar de `/`
+para servir la versión optimizada a móvil.
+
+### Bug crítico resuelto junto con el rebrand
+
+`index.html` tenía `html, body { overflow: hidden; height: 100%; }`
+declarado globalmente para la loading screen — **nunca** se acotó de
+vuelta. Esto rompió el scroll para **toda** la app (solo rangos
+específicos de píxeles renderizaban, p. ej. 0-200 y luego 250-600).
+Fix: el CSS de la loading screen se acotó a `#loading-screen` solo;
+`html, body` ahora permiten flujo natural del documento con solo
+`overflow-x: hidden`. Este bug había estado latente varias versiones;
+se resolvió como parte del commit del rebrand porque fue cuando se
+auditó el loading screen.
+
+### Consecuencia para ADR-0010
+
+El storytelling María & Antonio, los trust signals, la banner de
+transparencia del demo — todo se **conserva** en v0.5.0+. Lo que cambia
+es el **lenguaje visual**: la misma narrativa ahora se presenta con
+una identidad coherente (ink + paper + gold), tipografía profesional
+(Inter + JetBrains Mono), y separación estricta entre superficies
+públicas (Landing) y de app (Platform/Mobile). El "P" logo genérico
+mencionado en la sección "Negativas" del ADR original fue sustituido
+por el "N" Nitheky.

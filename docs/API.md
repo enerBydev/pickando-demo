@@ -21,7 +21,7 @@ backend is alive.
 {
   "status": "ok",
   "service": "pickando-backend",
-  "version": "0.2.0",
+  "version": "0.5.4",
   "stack": "Rust + Axum + Tokio (rustc 1.96)",
   "uptime_seconds": 42.51,
   "routes_count": 6,

@@ -20,6 +20,10 @@
 - [Demo en vivo](#demo-en-vivo)
 - [Arquitectura](#arquitectura)
 - [Endpoints REST](#endpoints-rest)
+- [Matching engine](#matching-engine)
+- [WebSocket en vivo](#websocket-en-vivo)
+- [Qué es demo y qué es placeholder](#qué-es-demo-y-qué-es-placeholder)
+- [Qué es reutilizable para producción](#qué-es-reutilizable-para-producción)
 - [Compilación rápida](#compilación-rápida)
 - [Multi-plataforma](#multi-plataforma)
 - [Testing y calidad](#testing-y-calidad)
@@ -165,6 +169,197 @@ wscat -c wss://pickando-demo.up.railway.app/ws
 
 ---
 
+## Matching engine
+
+El matching es la pieza central de Pickando: dado un pasajero en `(lat, lng)`
+buscando dentro de `radius_km`, devuelve las rutas candidatas ordenadas por
+relevancia. El algoritmo vive en `crates/shared/src/matching.rs` (funciones
+puras, sin I/O, sin `unsafe`) y se ejecuta en **4 etapas**:
+
+1. **Prefiltro geohash** — codifica el origen del pasajero y de cada ruta a
+   6 caracteres (~0.6 km por celda). Una comparación de prefijo compartido
+   en O(1) descarta rutas a más de ~500 km antes de cualquier cálculo
+   trigonométrico.
+2. **Refinamiento haversine** — distancia great-circle con radio terrestre
+   de 6371 km. Rechaza rutas con `haversine_km > radius_km`.
+3. **Similitud de dirección** — coseno de la diferencia angular entre el
+   bearing de la ruta (origen→destino) y el `passenger_bearing_deg` que
+   envía el pasajero. Rango `[-1, 1]`: `1` = misma dirección, `0` =
+   perpendicular, `-1` = opuesta.
+4. **Compatibilidad temporal** — ventana configurable
+   (`time_window_minutes`, default 60). Si la ruta sale dentro de la
+   ventana del pasajero, `score = 1 - diff_min / ventana`; fuera de la
+   ventana, `score = 0`.
+
+La **relevancia** combina los tres scores normalizados a `[0, 1]`:
+
+```text
+relevance = 0.5 · distance_score + 0.3 · direction_score + 0.2 · time_score
+```
+
+donde `distance_score = 1 - (distance / radius)`, `direction_score =
+(similarity + 1) / 2`, y `time_score` ya está en `[0, 1]`. Los pesos
+reflejan la prioridad del producto: la distancia es lo más importante (una
+ruta lejana no sirve), la dirección es el diferenciador frente a un
+despacho tipo taxi, y el tiempo es lo más flexible (los horarios de
+commute toleran pequeños desplazamientos).
+
+```bash
+# Matching simple (CDMX Zócalo, radio 5 km)
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/match \
+  -H "Content-Type: application/json" \
+  -d '{"lat": 19.4326, "lng": -99.1332, "radius_km": 5}'
+
+# Matching avanzado (con dirección + ventana temporal)
+curl -X POST https://pickando-demo-production.up.railway.app/api/v1/match \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lat": 19.4326,
+    "lng": -99.1332,
+    "radius_km": 5,
+    "passenger_bearing_deg": 0,
+    "time_window_minutes": 60,
+    "passenger_departure_time": "08:00"
+  }'
+```
+
+Cobertura: **40 unit tests + 6 property-based tests** con `proptest` que
+verifican simetría de haversine, no-negatividad, desigualdad triangular,
+acotamiento de `relevance` en `[0, 1]` para cualquier combinación de
+inputs, y que rutas norte tienen mayor relevancia que rutas sur a la misma
+distancia cuando el pasajero va al norte. Ver
+[ADR-0006](docs/adr/0006-geohash-haversine-matching.md) para el rationale
+completo y las alternativas descartadas (PostGIS, R-tree, KD-tree, H3).
+
+---
+
+## WebSocket en vivo
+
+El endpoint `/ws` abre una conexión bidireccional persistente. Cada cliente
+recibe un saludo `connected` al abrirse, un `live_tick` cada 5 segundos con
+telemetría del servidor (uptime, rutas activas, server time), y un `echo`
+por cada mensaje de texto que envíe. Además, cualquier mutación de estado
+(crear ruta, cancelar ruta, solicitar asiento) se retransmite como
+**broadcast** a todos los clientes conectados vía
+`tokio::sync::broadcast` (canal con capacidad 256).
+
+Los **event types reales** enviados por el backend (verificados en
+`crates/backend/src/ws.rs` y `crates/backend/src/routes.rs`):
+
+| `type`            | Disparador                                  | Envía a                    |
+|-------------------|---------------------------------------------|----------------------------|
+| `connected`       | Nueva conexión WS abierta                   | solo al cliente nuevo      |
+| `live_tick`       | Timer cada 5 s (uptime, rutas activas)      | solo al cliente nuevo      |
+| `echo`            | Cliente envía cualquier texto               | solo al emisor             |
+| `route_created`   | `POST /api/v1/routes` exitoso               | **todos** los WS clientes  |
+| `route_cancelled` | `DELETE /api/v1/routes/{id}` exitoso        | **todos** los WS clientes  |
+| `ride_request`    | `POST /api/v1/routes/{id}/request` exitoso  | **todos** los WS clientes  |
+
+El **formato del envelope** es JSON tipado y compartido entre backend y
+frontend vía `pickando_shared::models::WsMessage`:
+
+```json
+{
+  "type": "live_tick",
+  "message": "Tick #42s — servidor activo",
+  "data": {
+    "uptime_seconds": 42,
+    "server_time": 1718600000,
+    "active_routes": 6
+  }
+}
+```
+
+Conexión rápida de prueba:
+
+```bash
+wscat -c wss://pickando-demo-production.up.railway.app/ws
+# → recibes "connected" al instante
+# → cada 5 s un "live_tick" con telemetría
+# → si en otra pestaña haces POST /api/v1/routes, ves "route_created" en vivo
+```
+
+En el frontend, la pestaña **"WebSocket"** dentro de `/app/passenger` abre
+la conexión y renderiza cada evento en un log — es la forma más rápida de
+verificar el broadcast en tiempo real desde el navegador. v0.5.5 arregla
+un `RuntimeError: unreachable` que disparaba un trap por cada mensaje WS
+entrante en WASM (commit `f8143aa`); ver
+[ADR-0005](docs/adr/0005-ws-typed-json-envelope.md) para el protocolo
+completo.
+
+> **Nota de transparencia:** `position_update` (GPS en vivo) y `error`
+> **no están implementados** en la demo. El backend solo emite los 6
+> eventos listados arriba. Cuando se agregue tracking GPS real, el
+> envelope no cambia — basta con añadir `position_update` a la tabla de
+> dispatch.
+
+---
+
+## Qué es demo y qué es placeholder
+
+La demo es **funcional pero simplificada**. Esto es lo que está hardcoded,
+faked, o recortado para mantener el setup en cero-config:
+
+- **Estado en memoria** (`RwLock<Vec<Route>>` + `AtomicU64`), sin
+  PostgreSQL. El estado se reinicia al reiniciar el backend o vía
+  `POST /api/v1/demo-reset`. Ver
+  [ADR-0003](docs/adr/0003-in-memory-state.md).
+- **6 rutas seed hardcoded** en `main.rs::init_sample_routes()`
+  (Zócalo→Polanco, Alameda Central→Satélite, Reforma→Coyoacán, Monterrey
+  Centro→San Pedro Garza García, Tlalpan→Roma Norte, Indios Verdes→Condesa).
+  Reemplazable por seeding desde DB en producción.
+- **Sin autenticación**: no hay JWT, no hay OTP, no hay sesiones. Cualquier
+  visitante puede `POST`/`DELETE` rutas y solicitar asientos. Los
+  `driver_id` se generan automáticamente.
+- **Sin pagos**: no hay Stripe ni MercadoPago. La lógica de cost-sharing y
+  comisiones está documentada en la propuesta, no implementada.
+- **Sin GPS en vivo**: el WS emite `live_tick` (telemetría del servidor),
+  **no** `position_update` con coordenadas del conductor.
+- **Sin QR check-in/check-out, sin botón SOS, sin dashboard admin** (estas
+  features estaban en el roadmap v0.6 y se descartaron para esta entrega).
+- **Android es WebView wrapper** que carga la URL de producción — no es un
+  build nativo Dioxus mobile. Ver
+  [ADR-0004](docs/adr/0004-android-webview-wrapper.md).
+- **Persistencia best-effort**: el estado se escribe a `state.json` cada 30
+  segundos + en graceful shutdown (con `fsync`), pero no es WAL ni es
+  durable — un crash entre flushes pierde hasta 30 s de datos. Ver
+  [ADR-0013](docs/adr/0013-graceful-shutdown-and-fsync.md).
+
+Esta transparencia es intencional: Helder o cualquier revisor pueden ver
+exactamente qué es "real" vs "demo" sin tener que adivinarlo del código.
+
+---
+
+## Qué es reutilizable para producción
+
+El código está estructurado para que la migración a producción sea
+**sustituir, no reescribir**. La tabla lista cada componente y su nivel de
+reutilización directo (verificada contra el código actual):
+
+| Componente            | Reutilizable | Notas                                                              |
+|-----------------------|:------------:|--------------------------------------------------------------------|
+| `shared/models.rs`    | Sí           | Tipos serde listos para PostgreSQL (`sqlx` drop-in)                |
+| `shared/matching.rs`  | Sí           | Algoritmo puro (sin I/O) + 40 tests + property-based tests         |
+| `shared/benches/`     | Sí           | Benchmarks con `criterion` para detectar regresiones de perf       |
+| `backend/routes.rs`   | Sí           | Handlers Axum limpios + 25 tests de integración                    |
+| `backend/ws.rs`       | Sí           | Echo + live ticks + broadcast fan-out (`tokio::sync::broadcast`)   |
+| `backend/state.rs`    | Parcial      | Cambia `RwLock<Vec<Route>>` por `PgPool` en producción             |
+| `frontend/components` | Sí           | Componentes Dioxus reutilizables (cards, forms, navbar, footer)    |
+| `frontend/api.rs`     | Sí           | Helpers `fetch_json`/`post_json`/`delete_text`, agnósticos al endpoint |
+| Datos de prueba       | No           | Sembrados en `main.rs::init_sample_routes()`, reemplazables        |
+| CSS                   | Sí           | Design system completo (Mono Elegance + DE-Gold, dark theme, WCAG AAA) |
+| Dockerfile            | Sí           | Multi-stage, optimizado, `dioxus-cli` cacheado, non-root user      |
+| CI/CD                 | Sí           | GitHub Actions: lint, test, audit, deny, build, release APK        |
+| ADRs                  | Sí           | 13 ADRs documentando decisiones arquitectónicas                    |
+
+El patrón de migración típico: cambiar `state.rs` por `PgPool` + `sqlx`,
+añadir middleware JWT/OTP entre `TraceLayer` y los handlers, y extender la
+tabla de eventos WS con `position_update` (envelope sin cambios). El
+matching engine, los modelos, los handlers Axum, el frontend y el design
+system se quedan intactos.
+
+---
+
 ## Compilación rápida
 
 ### Requisitos
@@ -277,7 +472,7 @@ El workflow `.github/workflows/ci.yml` corre en cada push y PR:
 
 ### Cobertura de features enterprise
 
-- ✅ 51 tests automatizados (unit + property + integration)
+- ✅ 66 tests automatizados (unit + property + integration)
 - ✅ `cargo clippy` con `-D warnings` en CI
 - ✅ `cargo audit` contra RustSec advisory DB (nightly + on push)
 - ✅ `cargo deny` para licencias, bans, fuentes
@@ -285,7 +480,7 @@ El workflow `.github/workflows/ci.yml` corre en cada push y PR:
 - ✅ Profiles de release con LTO + strip + codegen-units=1
 - ✅ Sin bloques `unsafe` en el workspace
 - ✅ Conventional Commits + CHANGELOG.md
-- ✅ 6 ADRs documentando decisiones arquitectónicas
+- ✅ 13 ADRs documentando decisiones arquitectónicas
 - ✅ SECURITY.md + CONTRIBUTING.md + CODE_OF_CONDUCT.md
 - ✅ Templates de Issues y PR en `.github/`
 - ✅ Non-root Docker user + HEALTHCHECK
@@ -332,7 +527,7 @@ El workflow `.github/workflows/ci.yml` corre en cada push y PR:
 |----------------------------------------|----------------------------------------------|
 | [docs/API.md](docs/API.md)             | Referencia completa de la REST API + WS      |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitectura, diagrams, flujos          |
-| [docs/adr/](docs/adr/)                 | 6 Architecture Decision Records              |
+| [docs/adr/](docs/adr/)                 | 13 Architecture Decision Records             |
 | [CHANGELOG.md](CHANGELOG.md)           | Historial de versiones (Keep a Changelog)    |
 | [SECURITY.md](SECURITY.md)             | Política de seguridad + hardening checklist  |
 | [CONTRIBUTING.md](CONTRIBUTING.md)     | Cómo contribuir (workflow, PR template)      |
@@ -342,13 +537,13 @@ El workflow `.github/workflows/ci.yml` corre en cada push y PR:
 
 ## Roadmap
 
-### v0.2.0 (actual)
+### v0.5.5 (actual — esta entrega)
 
 - ✅ Matching multi-factor (geohash+haversine+bearing+time)
 - ✅ 8 endpoints REST + WebSocket con broadcast
 - ✅ Stats + telemetría
 - ✅ Tracing estructurado con request IDs
-- ✅ 51 tests + property-based + benchmarks
+- ✅ 66 tests + property-based + benchmarks
 - ✅ ADRs + governance docs
 - ✅ CI/CD con audit + deny
 

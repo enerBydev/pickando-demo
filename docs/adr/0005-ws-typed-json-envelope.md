@@ -117,3 +117,54 @@ and deserializes `data` into the appropriate struct.
 - The `connected` welcome message includes `"protocol": "pickando-ws-v1"`.
 - The frontend deserializes via `serde_json::from_str` into typed structs.
 - No raw string manipulation on either side.
+
+## Update — v0.5.4 (2026-06-20): event types actually observed in production
+
+The original Context section listed `position_update` and `error` as
+"planned for v0.3" / "validation errors". As of v0.5.4 the **actual
+event types** sent by the backend (verified in
+`crates/backend/src/ws.rs` and `crates/backend/src/routes.rs`) are:
+
+| `type`             | Origin                       | Trigger                                           | Sent to              |
+|--------------------|------------------------------|---------------------------------------------------|----------------------|
+| `connected`        | `ws::ws_handler` (on open)   | New WS client connects                            | the new client only  |
+| `live_tick`        | `ws::ws_handler` (5 s task)  | Periodic telemetry — uptime, server time, routes  | the new client only  |
+| `echo`             | `ws::ws_handler`             | Client sends any text message                     | the same client      |
+| `route_created`    | `routes::create_route`       | `POST /api/v1/routes` succeeds                    | **all** WS clients   |
+| `route_cancelled`  | `routes::cancel_route`       | `DELETE /api/v1/routes/{id}` succeeds             | **all** WS clients   |
+| `ride_request`     | `routes::request_ride`       | `POST /api/v1/routes/{id}/request` succeeds       | **all** WS clients   |
+
+The `position_update` event (originally listed as "planned for v0.3")
+**has not been implemented** — there is no live-GPS tracking in the
+demo. The `error` event **has not been implemented** either; protocol
+and validation errors are returned over HTTP (4xx) for the matching
+endpoints, and the WS layer simply drops malformed inbound frames.
+
+This is recorded here so future readers don't go hunting for a
+`position_update` dispatcher that doesn't exist. When live-GPS is added
+(in a real production version, not the demo), it should reuse the same
+envelope (just add `position_update` to the dispatch table) — the wire
+format itself does not need to change.
+
+### Frontend consumption (`crates/frontend/src/platform/passenger.rs`)
+
+The frontend's `WebSocketDemo` component opens the connection, sends the
+`connected` event handler's `data.protocol` to a status signal, and
+renders every subsequent `type` into a log line. The matcher uses
+`type === "live_tick" | "route_created" | …` discriminant checks, never
+raw `JSON.parse` into an untyped object.
+
+### v0.5.5 — WASM callback fix (commit f8143aa)
+
+A separate fix (commit `f8143aa`, shipped as part of v0.5.5) addressed
+a `RuntimeError: unreachable` trap that fired once per inbound WS
+message in the WASM build. Root cause: the four `wasm_bindgen::Closure`
+callbacks (`onopen`, `onmessage`, `onclose`, `onerror`) called
+`Signal::write()` directly from the JS event loop, with no Dioxus
+runtime on the thread-local `RUNTIMES` stack — triggering the explicit
+panic in `Runtime::current()` (dioxus-core 0.7.9, `runtime.rs:96`). The
+fix wraps each callback body in `runtime.in_scope(scope, || { … })`,
+capturing `runtime` + `scope` at the top of the `connect` handler. This
+is the canonical pattern recommended by the panic message itself. The
+wire format documented above is unchanged — the bug was purely in the
+client-side callback marshalling, not in the protocol.

@@ -5,6 +5,277 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] — 2026-06-20
+
+### Summary
+Patch de estabilización post-v0.5.4. Cierra un bug P0 de WASM reportado
+en QA con browser real, hidrata todos los ADRs con la información de
+los commits recientes, y añade tres ADRs nuevos (0011-0013) que
+documentan decisiones arquitectónicas que estaban implícitas en el
+código pero no en la documentación.
+
+### Fixed — WASM `RuntimeError: unreachable` (commit f8143aa)
+- **Bug P0:** cada mensaje WebSocket entrante en `/app/passenger` disparaba
+  un `RuntimeError: unreachable` en el WASM build (8 traps por 8 mensajes
+  en QA con browser real). El usuario veía la UI congelada después de
+  unos segundos.
+- **Root cause:** los cuatro `wasm_bindgen::Closure` callbacks
+  (`onopen`, `onmessage`, `onclose`, `onerror`) llamaban
+  `Signal::write()` directamente desde el JS event loop, sin un Dioxus
+  runtime en el thread-local `RUNTIMES` stack — disparando el panic
+  explícito en `Runtime::current()` (dioxus-core 0.7.9, `runtime.rs:96`).
+  Con `panic = "abort"`, ese panic baja a un trap `unreachable` de WASM.
+- **Fix:** capturar `Runtime::current()` + `current_scope_id()` al inicio
+  del handler `connect`, y envolver cada callback body en
+  `runtime.in_scope(scope, || { … })`. Es el patrón canónico que el
+  mensaje del panic mismo recomienda. Archivo único:
+  `crates/frontend/src/platform/passenger.rs` (+56 / -15 líneas).
+- Ver ADR-0005 §"v0.5.5 — WASM callback fix" para el análisis completo.
+
+### Added — ADRs nuevos (docs/adr/)
+- **ADR-0011:** Release APK signing — RSA 4096 non-debug cert + CI
+  post-build verification (commits `4968fe1`, `43f1ceb`).
+- **ADR-0012:** Strict Content-Security-Policy with `wasm-unsafe-eval`
+  (commits `aa74764`, `968e88a`).
+- **ADR-0013:** Graceful shutdown + persistence fsync (commit `a36b445`).
+
+### Changed — ADRs hidratados (docs/adr/)
+- **ADR-0003** — añadida sección "Update — v0.5.4" documentando la
+  atomicidad del `demo_reset` (commit `5b9f021`).
+- **ADR-0004** — añadida sección "Update — v0.5.4" con todo el
+  hardening del APK (signing RSA 4096 v2+v3, debuggable=false,
+  versionCode 504 derivado del tag, PNG launcher icons en 5 densidades,
+  offline.html, network_security_config, backup_rules, proguard rules,
+  CI post-build verification).
+- **ADR-0005** — añadida sección "Update — v0.5.4" listando los seis
+  event types realmente observados en producción (`connected`,
+  `live_tick`, `echo`, `route_created`, `route_cancelled`,
+  `ride_request`); aclarado que `position_update` y `error` **no** se
+  implementaron. Añadida sub-sección "v0.5.5 — WASM callback fix"
+  referenciando el fix de `f8143aa`.
+- **ADR-0006** — añadida sección "Update — v0.5.4" con la fórmula de
+  relevancia real (`0.5·dist + 0.3·dir + 0.2·tiempo`), las tres
+  normalizaciones, los pesos, y los tests `proptest`.
+- **ADR-0007** — añadida Layer 5 (`DefaultBodyLimit::max(64 * 1024)`,
+  commit `a36b445`).
+- **ADR-0008** — añadida sección "Update — v0.5.4" con HSTS
+  (`max-age=31536000`) y la CSP estricta
+  (`script-src 'self' 'wasm-unsafe-eval'`), con tabla
+  directiva-por-directiva.
+- **ADR-0009** — añadida sección "Update — v0.5.4" documentando la
+  reseed atómica off-lock + swap (commit `5b9f021`) y la decisión
+  deliberada de no broadcastear un evento WS post-reset.
+- **ADR-0010** — añadida sección "Update — v0.5.0" documentando el
+  rebranding a **Nitheky** + paleta **Mono Elegance / DE-Gold**
+  (`#0A0A0A` ink + `#C9A961` gold + `#FAFAFA` paper), tipografía
+  Inter + JetBrains Mono, y la separación estricta Landing/Platform/Mobile
+  vía Dioxus Router (commit `30e147a`).
+- **docs/adr/README.md** — índice actualizado con los 13 ADRs (faltaban
+  las entradas 0007-0010 en el índice anterior).
+
+### Changed — Otros docs
+- `SECURITY.md` — actualizada la tabla de versiones soportadas (era
+  `0.2.x`, ahora `0.5.x`).
+- `docs/ARCHITECTURE.md` — sin cambios funcionales (la arquitectura
+  es la misma); verificado que el diagrama de WebSocket fan-out lista
+  los eventos correctos.
+- `docs/API.md` — actualizado el `version` del ejemplo de `/health`
+  (era `0.2.0`, ahora `0.5.4`); el resto del doc sigue siendo preciso
+  para v0.5.x.
+- `CONTRIBUTING.md` — actualizada la lista de ADRs referenciados en
+  "Architecture" para incluir ADR-0005 a ADR-0013.
+
+### Verified
+- `cargo test --workspace --doc` — pasa (1 doc test, 0 fallos).
+- `cargo fmt --check` y `cargo clippy --workspace --all-targets -- -D warnings`
+  corren como parte del CI normal (no se tocaron archivos de código).
+- Sin cambios en código Rust; solo docs y ADRs.
+
+## [0.5.4] — 2026-06-20
+
+### Summary
+Release de estabilización enfocado en cerrar **todas** las causas raíz
+del fallo de instalación del APK v0.5.3 ("Nitheky — No se instaló la
+app"), más varios hardening de seguridad y SRE identificados en la
+auditoría multi-rol (Security 8-a, UX 8-b, SRE 8-c). El APK v0.5.4
+(2.27 MB) es el que se entrega al cliente Helder.
+
+### Fixed — APK install (commit 43f1ceb)
+- **Firma con certificado NO-debug:** `signingConfigs.release` en
+  `android/app/build.gradle` lee keystore de env (`ANDROID_KEYSTORE_BASE64`
+  secret en CI). Si el secret no existe, CI genera un CI-only keystore
+  RSA 4096 con identidad `CN=Pickando Demo, OU=Engineering, O=enerBydev,
+  L=BuenosAires, ST=BuenosAires, C=AR`. Firma con esquemas **v2 + v3**
+  (v1 JAR-signing omitido — minSdk=24 no lo necesita).
+- **`android:debuggable=false` explícito** en `AndroidManifest.xml`
+  (era implícito `true` por el `assembleDebug` del workflow).
+- **`android:usesCleartextTraffic=false`** (solo cargamos HTTPS).
+- **`android:extractNativeLibs=true`** (future-proof para NDK libs).
+- **`android:largeHeap=true`, `supportsRtl=true`, `hardwareAccelerated=true`.**
+- **`android:fullBackupContent=@xml/backup_rules`** +
+  **`android:dataExtractionRules=@xml/data_extraction_rules`** —
+  compliance Android 12+.
+- **`android:roundIcon`** para launcher icons redondos.
+- **`launchMode=singleTop`, `windowSoftInputMode=adjustResize`.**
+- **`versionCode` derivado del git tag** (v0.5.4 → 504, en lugar de
+  hardcoded `1`). `versionName` también derivado del tag.
+- **PNG launcher icons en todas las densidades** (mdpi/hdpi/xhdpi/xxhdpi/
+  xxxhdpi) generados con Python + Pillow. Diseño: ink `#0A0A0A` bg +
+  gold `#C9A961` ring + "N" blanca. Trae el count de `mipmap/ic_launcher`
+  a 7 (anydpi-v26 + 5 PNGs), cubriendo API 24 hasta la más reciente.
+- **`assets/offline.html`** bundled — página offline branded Nitheky
+  (gold/ink theme, botón retry).
+- **`res/xml/network_security_config.xml`** — `cleartextTrafficPermitted=false`
+  + solo system CAs (no user-installed CAs) — previene MitM.
+- **`res/xml/backup_rules.xml`** + **`res/xml/data_extraction_rules.xml`**.
+- **`proguard-rules.pro`** — keep WebView reflection classes.
+- **`MainActivity.java` hardening:**
+  - `ConnectivityManager` check al launch.
+  - `onReceivedError` + `onReceivedHttpError` → cargan `offline.html`
+    en main-frame failures.
+  - `MIXED_CONTENT_NEVER_ALLOW` — mixed content hard block.
+  - `WebView.cleanup()` en `onDestroy` (no memory leaks).
+  - `try/catch` alrededor del setup (crash-safe).
+- **`build.gradle` hardening:**
+  - `signingConfigs.release` reads from env (CI injects).
+  - `versionCode`/`versionName` via `-P` properties from CI.
+  - `buildConfigField BUILD_VERSION` para diagnostics.
+  - `vectorDrawables.useSupportLibrary=true`.
+  - `packagingOptions exclude DebugProbesKt.bin` (20% reducción de tamaño).
+  - `lint { abortOnError false }`.
+  - `buildFeatures.buildConfig=true`.
+- **`gradle.properties`:** parallel + caching enabled.
+- **`.gitignore`:** ignora build artifacts, mantiene `gradlew` +
+  `gradle-wrapper.jar` committed.
+
+### Added — Release workflow post-build verification (commit 43f1ceb)
+Cuatro assertions después de `apksigner sign` (cualquier fail cancela
+el release):
+1. `apksigner verify` + `grep "CN=Android Debug"` → fail si debug cert.
+2. `aapt dump xmltree` + `grep debuggable=true` → fail si debuggable.
+3. `aapt dump resources` + count `mipmap/ic_launcher` → fail si `< 6`.
+4. `stat` APK size → warn si `> 10 MB` (no fail).
+Ver ADR-0011 para el análisis arquitectónico completo.
+
+### Fixed — SRE + Security (commit a36b445)
+- **Graceful shutdown:** handler `ctrl_c` + SIGTERM (Unix) pasado a
+  `axum::serve(...).with_graceful_shutdown(...)`. En signal: deja de
+  aceptar conexiones nuevas, deja que los requests in-flight completen
+  (hasta 10s), luego retorna. Antes: el proceso era SIGKILL-eado por
+  Railway después del grace period, abortando requests in-flight.
+- **Final persistence flush con `fsync`:** `persistence.rs` refactorizado
+  para exponer `persist_state_once()` pública. Llamada una vez desde
+  `main()` después del graceful shutdown. `sync_all()` antes de
+  `rename()` garantiza que si rename retorna `Ok`, los datos están en
+  disco (sin fsync, un power loss post-rename puede dejar el archivo
+  final con 0 bytes). Bounda la pérdida de estado a ~1s (vs hasta 30s
+  antes).
+- **`DefaultBodyLimit::max(64 * 1024)`:** 64 KB cap en todos los
+  endpoints. Axum short-circuit con `413 Payload Too Large` antes de
+  deserializar — bloquea DoS de buffer-exhaustion al nivel del router.
+- **CI least-privilege:** el job `release` ahora depende explícitamente
+  de `build-android` (antes no estaba en `needs:`, así que el release
+  se publicaba aunque Android fallara). Eliminado `continue-on-error:
+  true` que ocultaba fallos del build Android.
+- Ver ADR-0013 para el análisis arquitectónico completo.
+
+### Fixed — Dockerfile (commit b32777c)
+- `watchdog.js` no se copiaba al output estático del build Docker —
+  el tag `<script src="/watchdog.js">` en `index.html` resultaba en
+  404. Ahora el Dockerfile copia `crates/frontend/assets/watchdog.js`
+  al directorio `static/` antes del `CMD`.
+
+### Fixed — WASM load + watchdog bajo strict CSP (commit 968e88a)
+- **Bug P0 — WASM nunca carga:** CSP `script-src 'self'` bloquea
+  `WebAssembly.compile()`. Chrome lanza
+  `CompileError: WebAssembly.compile() violates CSP directive
+  "script-src 'self'"`. La loading screen se quedaba para siempre.
+  Fix: añadido `'wasm-unsafe-eval'` a `script-src`. Es la directiva
+  CSP3 narrowly-scoped que **solo** permite WebAssembly, NO
+  `eval()`/`Function()`. Soportada por todos los browsers modernos
+  desde 2022.
+- **Bug P0 — watchdog nunca corre:** mismo `script-src 'self'` sin
+  `'unsafe-inline'` bloqueaba el IIFE watchdog inline en `index.html`.
+  Fix: el watchdog se movió a archivo externo `watchdog.js` servido
+  por el backend (sin cambios al código JS, solo refactor de
+  ubicación). `script-src 'self'` permite scripts same-origin.
+- Ver ADR-0012 para el análisis arquitectónico completo.
+
+### Added — HSTS + Content-Security-Policy headers (commit aa74764)
+- **`Strict-Transport-Security: max-age=31536000`** en cada response.
+  Browsers lo ignoran sobre HTTP, así que dev local no se afecta;
+  producción (HTTPS en Railway) recibe el pin HSTS de 1 año. Sin
+  `includeSubDomains` (el dominio `*.up.railway.app` es compartido).
+- **`Content-Security-Policy`** estricta:
+  - `default-src 'self'`
+  - `script-src 'self' 'wasm-unsafe-eval'`
+  - `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`
+  - `font-src 'self' https://fonts.gstatic.com data:`
+  - `img-src 'self' data: https:`
+  - `connect-src 'self' ws: wss:`
+  - `frame-ancestors 'none'`
+  - `base-uri 'self'`
+  - `form-action 'self'`
+- Verificado live con `curl -I` en producción: los seis headers de
+  seguridad (`x-content-type-options`, `x-frame-options`,
+  `referrer-policy`, `permissions-policy`, `content-security-policy`,
+  `strict-transport-security`) están presentes.
+- Ver ADR-0008 §"Update — v0.5.4" y ADR-0012 para el análisis completo.
+
+### Fixed — Atomic demo_reset + validación explícita (commit 5b9f021)
+- **`demo_reset` atomicidad:** antes hacía cuatro write-locks
+  secuenciales (clear routes, clear ride_requests, clear history,
+  re-seed routes) — un lector concurrente podía observar un listado
+  vacío entre el "clear" y el "re-seed". Ahora construye el seed
+  off-lock y lo swappea atómicamente con `*routes = seed_routes`.
+  Lectores ven o bien el estado viejo o bien el nuevo, nunca un
+  intermedio *torn*.
+- **`find_matches` DRY:** antes llamaba `body.sanitized()` dos veces
+  (una en el if-branch, re-haciendo el trabajo). Reemplazado con `&req`
+  (el clone ya sanitizado).
+- **`passenger.rs` silent-fallback:** antes, si el usuario tecleaba
+  `lat`/`lng`/`radius_km` inválidos, el frontend silenciosamente
+  caía a coordenadas CDMX (`19.4326, -99.1332`). Ahora valida cada
+  campo explícitamente y muestra un error claro en la UI; nunca
+  procede con datos garbage.
+- Ver ADR-0003 §"Update — v0.5.4" y ADR-0009 §"Update — v0.5.4" para
+  el análisis completo.
+
+### Verified — Forensic re-audit del APK v0.5.4
+- SHA256: `31018f0aa683cf1222616d3bd912cec3fe85bc3563074e23828759880760037a`
+- Tamaño: 2,384,141 bytes (2.27 MB) — 20% más chico que v0.5.3.
+- `apksigner verify`:
+  - Signer DN: `CN=Pickando Demo, OU=Engineering, O=enerBydev,
+    L=BuenosAires, ST=BuenosAires, C=AR`
+  - RSA 4096 bits
+  - v2 ✓, v3 ✓
+- `aapt dump badging`:
+  - `versionCode=504` (era 1)
+  - `versionName=0.5.4` (era 0.1.0)
+  - `minSdk=24, targetSdk=34`
+- `aapt dump xmltree`:
+  - `debuggable=0x0` (FALSE) ✓
+  - `usesCleartextTraffic=0x0` (FALSE) ✓
+  - `extractNativeLibs=0xffffffff` (TRUE) ✓
+  - `largeHeap`, `supportsRtl`, `hardwareAccelerated` ✓
+  - `fullBackupContent`, `dataExtractionRules`, `roundIcon` ✓
+  - `launchMode=0x1` (singleTop) ✓
+  - `windowSoftInputMode=0x10` (adjustResize) ✓
+- `aapt dump resources`:
+  - `mipmap/ic_launcher`: 7 entries (anydpi-v26 + 5 PNG densities) ✓
+  - `mipmap/ic_launcher_round`: 7 entries ✓
+- Assets:
+  - `assets/offline.html` bundled (2328 bytes) ✓
+  - `assets/dexopt/baseline.prof` ✓
+- Ver ADR-0011 y el `worklog.md` Task ID: 3 Phase D para el reporte
+  forense completo.
+
+### Verified — CI
+- Workflow run #13: 5/5 jobs PASSED (build-linux, build-windows,
+  build-web, build-android, release).
+- Total workflow time: ~5 min.
+- Post-build verification: todos los cuatro checks pasaron.
+
 ## [0.5.3] — 2026-06-19
 
 ### Summary

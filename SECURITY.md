@@ -4,8 +4,9 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 0.2.x   | :white_check_mark: |
-| < 0.2   | :x:                |
+| 0.5.x   | :white_check_mark: |
+| 0.4.x   | :x:                |
+| < 0.4   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -31,10 +32,22 @@ This project benefits from Rust's memory-safety guarantees:
   pointer dereferences (eliminates ~70% of CVEs per Microsoft Security
   Response Center data).
 - **`sqlx` macro-verified queries** will be used when PostgreSQL lands
-  (planned for `0.3.0`) — eliminates SQL injection by construction.
+  (planned for `0.6.0+`) — eliminates SQL injection by construction.
 - **`rustls`** instead of OpenSSL — no C TLS dependency to audit.
-- **`tower-http`** middleware provides CORS, compression, and tracing out of
-  the box.
+- **`tower-http`** middleware provides CORS, compression, tracing, and
+  security headers (`X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`,
+  `Content-Security-Policy` — see ADR-0008 and ADR-0012) out of the box.
+- **Strict CSP** with `script-src 'self' 'wasm-unsafe-eval'` — blocks XSS
+  vectors while allowing Dioxus WASM to load (see ADR-0012).
+- **Graceful shutdown** + persistence `fsync` (see ADR-0013) — bounds
+  state loss to ~1s on redeploy and prevents zero-byte state files on
+  power loss.
+- **`DefaultBodyLimit::max(64 * 1024)`** — 64 KB request body cap blocks
+  buffer-exhaustion DoS at the router (see ADR-0007 §Layer 5).
+- **Release APK signing** with RSA 4096 non-debug cert + CI post-build
+  verification (see ADR-0011) — every release APK is verified non-debug
+  before being published.
 
 ## Supply chain
 

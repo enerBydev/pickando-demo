@@ -112,6 +112,15 @@ In particular:
 - [ADR-0002](docs/adr/0002-workspace-layout.md) — Why 3 crates
 - [ADR-0003](docs/adr/0003-in-memory-state.md) — Why in-memory store for the demo
 - [ADR-0004](docs/adr/0004-android-webview-wrapper.md) — Why Android uses WebView wrapper
+- [ADR-0005](docs/adr/0005-ws-typed-json-envelope.md) — Why typed JSON envelope for WS
+- [ADR-0006](docs/adr/0006-geohash-haversine-matching.md) — Why geohash + haversine for matching
+- [ADR-0007](docs/adr/0007-request-body-validation-strategy.md) — Why defense-in-depth validation
+- [ADR-0008](docs/adr/0008-cors-and-security-headers.md) — Why restrictive CORS + security headers
+- [ADR-0009](docs/adr/0009-demo-reset-endpoint.md) — Why public unauthenticated demo-reset
+- [ADR-0010](docs/adr/0010-ui-ux-redesign-storytelling.md) — Why storytelling UX + Nitheky brand
+- [ADR-0011](docs/adr/0011-release-apk-signing-and-ci-verification.md) — Why RSA 4096 + CI post-build verification
+- [ADR-0012](docs/adr/0012-strict-csp-wasm-unsafe-eval.md) — Why strict CSP with `wasm-unsafe-eval`
+- [ADR-0013](docs/adr/0013-graceful-shutdown-and-fsync.md) — Why graceful shutdown + persistence fsync
 
 ## Testing strategy
 
@@ -153,8 +162,12 @@ This runs `cargo fmt --check` + `cargo clippy` on staged files before commit.
 Releases are automated via `.github/workflows/release.yml`:
 
 1. Update `CHANGELOG.md` and bump version in `Cargo.toml`.
-2. Tag: `git tag v0.2.0 && git push origin v0.2.0`.
-3. CI builds Linux binary + Android APK and publishes a GitHub Release.
+2. Tag: `git tag v0.5.5 && git push origin v0.5.5`.
+3. CI builds Linux binary + Windows binary + Web WASM bundle + Android
+   APK and publishes a GitHub Release. The Android APK is signed with
+   an RSA 4096 non-debug cert and verified by four post-build checks
+   (see ADR-0011); CI will refuse to publish the release if any check
+   fails.
 
 ## Questions?
 

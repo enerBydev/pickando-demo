@@ -107,3 +107,44 @@ when the validation rules become more complex.
 - `crates/backend/src/routes.rs` — `Json<serde_json::Value>` handlers
 - `crates/backend/src/routes.rs::validate_departure_time` — field-level validation
 - serde docs: <https://serde.rs/attr-deny-unknown-fields.html>
+
+## Update — v0.5.4 (commit a36b445, 2026-06-19): body-size limit (Layer 5)
+
+The three-layer defense above catches **structurally invalid** bodies
+(arrays, unknown fields, out-of-range values) but does not bound the
+**size** of the request. An attacker (or a buggy client) could POST a
+multi-megabyte JSON array of junk and force serde to allocate it before
+the `is_object()` check even runs — a trivial denial-of-service vector
+on Railway's free tier.
+
+Commit `a36b445` adds a fifth layer:
+
+### Layer 5: `DefaultBodyLimit::max(64 * 1024)`
+
+Installed in the Axum router stack in `crates/backend/src/main.rs`:
+
+```rust
+.layer(DefaultBodyLimit::max(64 * 1024))
+```
+
+This caps the request body at **64 KB** for every endpoint. Axum
+short-circuits the request with `413 Payload Too Large` **before** the
+body is buffered or deserialized, so the JSON parser never sees an
+oversized payload. 64 KB is generous for every legitimate request in
+the demo (the largest valid payload is `CreateRouteRequest` at <1 KB),
+and tight enough to make buffer-exhaustion DoS uneconomic.
+
+The limit applies uniformly to all routes; per-route limits would be
+cleaner but add middleware complexity that the demo doesn't need. If a
+future endpoint legitimately needs a larger body (e.g. image upload for
+driver-license verification), it can `route_layer` an override on just
+that route.
+
+### Layer 6 (future): `garde` declarative validation
+
+Renamed from "Layer 4" in the original ADR — the original Layer 4 was
+deferred and is now renumbered to Layer 6 to make room for the
+body-size limit as Layer 5. Same scope and rationale: declarative
+`#[garde(range(min = -90.0, max = 90.0))]` attributes would eliminate
+the manual validation boilerplate, but is not adopted in v0.5.x to
+avoid a new dependency mid-sprint.

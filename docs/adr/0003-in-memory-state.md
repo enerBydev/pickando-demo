@@ -93,10 +93,44 @@ The store is wrapped in `Arc` and injected into every Axum handler via
   `Arc<RwLock<Vec<Route>>>` with `PgPool` and the handler signatures
   barely change.
 
+## Update — v0.5.4 (commit 5b9f021, 2026-06-19)
+
+The public demo-reset endpoint (`POST /api/v1/demo-reset`, see ADR-0009)
+originally performed four separate write-lock acquisitions in sequence:
+clear routes, clear ride_requests, clear relevance history, re-seed
+routes. A concurrent reader calling `GET /api/v1/routes` between the
+"clear routes" and the "re-seed" steps would observe an empty list — a
+visible, if harmless, flicker in the demo UI.
+
+The fix (commit 5b9f021) builds the seed vector **off-lock** and then
+swaps it in via a single `*routes = seed_routes` assignment inside one
+short write guard. Each collection is swapped independently, but no
+reader can ever observe an empty intermediate state — they see either
+the old state or the new state, never a torn one. This is the canonical
+"build off-lock, swap atomically" pattern for `tokio::sync::RwLock`.
+
+The same commit also replaced the silent CDMX-coordinate fallback in the
+passenger search with explicit per-field validation: invalid
+`lat`/`lng`/`radius_km` now produce a visible error in the UI instead of
+silently relocating the search to `(19.4326, -99.1332)`.
+
+### Consequence for the in-memory model
+
+Atomicity is per-collection, not cross-collection: a reader can still
+observe "new routes + old ride_requests" for the brief window between
+the two swaps. For a demo this is acceptable (the ride_requests are
+displayed on a separate page that re-fetches on mount). For production
+this would be solved by a single transactional `UPDATE … WHERE` block
+in PostgreSQL, which is one of the reasons ADR-0003 itself is marked
+"demo only".
+
 ## Compliance
 
 - `AppState` lives in `crates/backend/src/state.rs`.
 - All handlers depend on `State<Arc<AppState>>` (or `AppState` methods),
   never on concrete collection types.
+- `demo_reset` builds the seed off-lock and swaps it in inside a single
+  short write guard (verified by `demo_reset_clears_state_and_reseeds`
+  and `demo_reset_clears_relevance_scores` regression tests).
 - When we promote to production in v0.3.0, this ADR will be superseded
   by an ADR-NNNN: "PostgreSQL via sqlx for production persistence".
