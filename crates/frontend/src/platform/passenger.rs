@@ -1,3 +1,4 @@
+use dioxus::core::{current_scope_id, Runtime};
 use dioxus::prelude::*;
 use pickando_shared::models::{MatchRequest, MatchResult, Route};
 use wasm_bindgen::JsCast;
@@ -589,24 +590,51 @@ fn WebSocketDemo() -> Element {
             let ws_rc = std::rc::Rc::new(ws.clone());
             ws_handle.set(Some(ws_rc.clone()));
 
+            // The raw `web_sys::WebSocket` callback closures below fire
+            // **outside** the Dioxus scheduler task — the JS event loop
+            // invokes them directly. Mutating a `Signal` from that context
+            // used to trip a `RuntimeError: unreachable` in WASM builds
+            // (one trap per inbound WS message) because the Dioxus runtime
+            // and scope stacks were empty when the closure ran.
+            //
+            // Canonical Dioxus 0.7 fix (see the panic message in
+            // `Runtime::current()` in dioxus-core 0.7): capture the runtime
+            // and scope while we're still inside the `connect` event handler
+            // (which runs inside a Dioxus scope), then re-enter that scope
+            // with `Runtime::in_scope` before touching any Signal. This
+            // pushes a `RuntimeGuard` + the owning `ScopeId` onto the
+            // thread-local stacks so the scheduler's invariants hold.
+            // `Runtime::current()` panics with a descriptive message if no
+            // runtime is on the stack — which is what we want, since the
+            // `connect` handler always runs inside the Dioxus runtime.
+            let runtime = Runtime::current();
+            let scope = current_scope_id();
+
             let mut messages_handle = messages.to_owned();
             let mut connected_handle = connected.to_owned();
             let mut count_handle = msg_count.to_owned();
             let ws_handle_clone = ws_handle.to_owned();
 
+            // Each closure gets its own `Rc<Runtime>` clone — the closures
+            // are `move`d (and then `forget`-ed) so they need to own their
+            // runtime handle. `Rc::clone` is a cheap refcount bump.
+            let runtime_open = runtime.clone();
             let onopen =
                 wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::new(move |_e| {
-                    connected_handle.set(true);
-                    *count_handle.write() = 0;
-                    messages_handle
-                        .write()
-                        .push("[+] Conectado al servidor WebSocket".into());
+                    runtime_open.in_scope(scope, || {
+                        connected_handle.set(true);
+                        *count_handle.write() = 0;
+                        messages_handle
+                            .write()
+                            .push("[+] Conectado al servidor WebSocket".into());
+                    });
                 });
             ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
             onopen.forget();
 
             let mut messages_handle2 = messages.to_owned();
             let mut count_handle2 = msg_count.to_owned();
+            let runtime_msg = runtime.clone();
             let onmessage = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::MessageEvent)>::new(
                 move |e: web_sys::MessageEvent| {
                     if let Some(text) = e.data().as_string() {
@@ -623,10 +651,14 @@ fn WebSocketDemo() -> Element {
                                 .to_string(),
                             Err(_) => "raw".to_string(),
                         };
-                        *count_handle2.write() += 1;
-                        messages_handle2
-                            .write()
-                            .push(format!("[<] [{label}] {pretty}"));
+                        // Marshal the Signal mutations back into the Dioxus
+                        // scheduler — see the comment above `runtime`/`scope`.
+                        runtime_msg.in_scope(scope, || {
+                            *count_handle2.write() += 1;
+                            messages_handle2
+                                .write()
+                                .push(format!("[<] [{label}] {pretty}"));
+                        });
                     }
                 },
             );
@@ -636,25 +668,34 @@ fn WebSocketDemo() -> Element {
             let mut messages_handle3 = messages.to_owned();
             let mut ws_handle_clone3 = ws_handle_clone.to_owned();
             let mut connected_handle2 = connected.to_owned();
+            let runtime_close = runtime.clone();
             let onclose =
                 wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::CloseEvent)>::new(move |_e| {
-                    connected_handle2.set(false);
-                    ws_handle_clone3.set(None);
-                    messages_handle3.write().push("[!] Conexión cerrada".into());
+                    runtime_close.in_scope(scope, || {
+                        connected_handle2.set(false);
+                        ws_handle_clone3.set(None);
+                        messages_handle3.write().push("[!] Conexión cerrada".into());
+                    });
                 });
             ws.set_onclose(Some(onclose.as_ref().unchecked_ref()));
             onclose.forget();
 
             let mut messages_handle4 = messages.to_owned();
+            let runtime_err = runtime.clone();
             let onerror =
                 wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::new(move |_e| {
-                    messages_handle4
-                        .write()
-                        .push("Error en la conexión WebSocket".into());
+                    runtime_err.in_scope(scope, || {
+                        messages_handle4
+                            .write()
+                            .push("Error en la conexión WebSocket".into());
+                    });
                 });
             ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
             onerror.forget();
         } else {
+            // This branch runs synchronously inside the `connect` event
+            // handler, so the runtime/scope are already on the stack — no
+            // guard needed.
             messages
                 .write()
                 .push("[!] No se pudo crear el WebSocket".into());
