@@ -1,0 +1,22 @@
+# Gradle / Android build artifacts
+.gradle/
+build/
+app/build/
+local.properties
+
+# Native wrappers — kept under VCS (gradlew, gradle-wrapper.jar) per
+# Gradle best practice, so CI doesn't have to invoke `gradle wrapper`.
+
+# Keystore files — NEVER commit
+*.keystore
+*.jks
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

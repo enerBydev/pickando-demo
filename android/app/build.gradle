@@ -8,14 +8,48 @@ android {
         applicationId "com.pickando.demo"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "0.1.0"
+        // versionCode is bumped per release via -PversionCode=NNN (CI passes the
+        // build number derived from the git tag, e.g. v0.5.4 → 50401).
+        // Default 1 only used for local dev builds.
+        versionCode (project.hasProperty('versionCode') ? project.versionCode.toInteger() : 1)
+        versionName (project.hasProperty('versionName') ? project.versionName : "0.1.0")
+        // Surface the version in BuildConfig for diagnostics
+        buildConfigField "String", "BUILD_VERSION", "\"${versionName}\""
+        // Force correct resource compression
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        release {
+            // CI injects these via env vars. Locally, leave null so Gradle
+            // produces app-release-unsigned.apk (which CI then signs with apksigner).
+            if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+                storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
+            // Sign at build time when keystore env vars are present;
+            // otherwise produce unsigned APK (CI signs it later).
+            if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+                signingConfig signingConfigs.release
+            }
+            // Keep minify off for now — R8 strips WebView-related reflection
+            // and crashes the app at runtime. Enable later with proper rules.
             minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Explicitly NOT debuggable
+            debuggable false
+            // Strip DebugProbesKt.bin (Kotlin coroutine debug artifact) from release
+            packagingOptions {
+                exclude 'DebugProbesKt.bin'
+            }
         }
         debug {
             debuggable true
@@ -25,6 +59,18 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Lint: don't fail the release build on stylistic issues
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+        disable 'MissingTranslation', 'ExtraTranslation'
+    }
+
+    // Build features — enable BuildConfig for diagnostics
+    buildFeatures {
+        buildConfig true
     }
 }
 

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Data extraction rules — Android 13+ (API 33+).
+    Controls what gets backed up or transferred via device-to-device migration.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="." />
+        <exclude domain="database" path="webview.db" />
+        <exclude domain="database" path="webviewCache.db" />
+        <exclude domain="file" path="cache/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+        <exclude domain="database" path="webview.db" />
+        <exclude domain="database" path="webviewCache.db" />
+        <exclude domain="file" path="cache/" />
+    </device-transfer>
+</data-extraction-rules>

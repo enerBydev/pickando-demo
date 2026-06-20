@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules — exclude sensitive WebView cache and cookies from backups.
+    Android 12- uses this file. Android 13+ uses data_extraction_rules.xml.
+-->
+<full-backup-content>
+    <include domain="sharedpref" path="." />
+    <exclude domain="database" path="webview.db" />
+    <exclude domain="database" path="webviewCache.db" />
+    <exclude domain="file" path="cache/" />
+</full-backup-content>

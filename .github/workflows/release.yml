@@ -131,8 +131,6 @@ jobs:
         run: cd crates/frontend && dx build --platform web --release
 
       - name: Copy main.css to build output
-        # Dioxus 0.7 quirk: it injects <link rel="stylesheet" href="/assets/main.css">
-        # into index.html but does NOT copy main.css from asset_dir. We must do it manually.
         run: |
           DIST_DIR="target/dx/pickando-frontend/release/web/public"
           mkdir -p "$DIST_DIR/assets"
@@ -152,12 +150,11 @@ jobs:
           path: target/dx/pickando-frontend/release/web/public/
 
   # ============================================================
-  # Build Android APK — WebView wrapper
+  # Build Android APK — WebView wrapper (release-signed)
   # ============================================================
   # Strategy: build a WebView wrapper APK that loads the live deployed site.
-  # This is reliable in CI (just Gradle + standard Android SDK, no NDK
-  # required), small (~100KB APK), fast to build (~3 min vs ~30+ min for
-  # native), and always works because it just wraps the web app.
+  # Reliable in CI (just Gradle + standard Android SDK, no NDK required),
+  # small APK, fast to build, always works because it just wraps the web app.
   # ============================================================
   build-android:
     name: Build Android APK (WebView wrapper, release-signed)
@@ -173,47 +170,94 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          sdk-platform: 34
-          sdk-build-tools: 34.0.0
+
+      - name: Install required Android SDK components
+        run: |
+          # setup-android@v3 doesn't accept sdk-platform / sdk-build-tools inputs;
+          # install them explicitly via sdkmanager.
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" "build-tools;34.0.0" "platform-tools" || true
+          test -d "$ANDROID_SDK_ROOT/platforms/android-34"
+          test -f "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt"
+          test -f "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner"
+          test -f "$ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign"
+
+      - name: Compute version from tag
+        id: ver
+        run: |
+          # Derive versionName + versionCode from the triggering tag.
+          # Tag format: v0.5.4 → versionName=0.5.4, versionCode=50400
+          # (major * 10000 + minor * 100 + patch)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          # Strip leading 'v'
+          V="${TAG#v}"
+          # Parse semver
+          MAJOR=$(echo "$V" | cut -d. -f1)
+          MINOR=$(echo "$V" | cut -d. -f2)
+          PATCH=$(echo "$V" | cut -d. -f3 | cut -d- -f1)
+          # Default missing components to 0
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+          VCODE=$((${MAJOR}*10000 + ${MINOR}*100 + ${PATCH}))
+          echo "versionName=${V}" >> $GITHUB_OUTPUT
+          echo "versionCode=${VCODE}" >> $GITHUB_OUTPUT
+          echo "Computed: tag=${TAG} versionName=${V} versionCode=${VCODE}"
 
       - name: Verify Android project structure
         run: |
           echo "=== Android project structure ==="
-          find android -type f | sort
+          find android -type f -not -path '*/build/*' -not -path '*/.gradle/*' | sort
           echo "=== Verify required files exist ==="
           test -f android/app/src/main/AndroidManifest.xml
           test -f android/app/src/main/java/com/pickando/demo/MainActivity.java
           test -f android/app/src/main/res/values/strings.xml
           test -f android/app/src/main/res/values/styles.xml
           test -f android/app/src/main/res/xml/network_security_config.xml
+          test -f android/app/src/main/res/xml/backup_rules.xml
+          test -f android/app/src/main/res/xml/data_extraction_rules.xml
           test -f android/app/src/main/res/drawable/ic_launcher_foreground.xml
           test -f android/app/src/main/res/drawable/ic_launcher_background.xml
           test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          test -f android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          test -f android/app/src/main/assets/offline.html
           test -f android/app/build.gradle
           test -f android/build.gradle
           test -f android/settings.gradle
           test -f android/gradle.properties
           test -f android/gradle/wrapper/gradle-wrapper.properties
+          test -f android/gradle/wrapper/gradle-wrapper.jar
+          test -f android/gradlew
+          test -x android/gradlew
           echo "[OK] All Android project files present"
 
-      - name: Set up Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: '8.2'
-
-      - name: Build unsigned release APK
+      - name: Build release APK with versionCode from tag
         working-directory: android
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
-          gradle wrapper --gradle-version 8.2
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          # Pass versionCode + versionName via -P properties
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            -PversionCode=${{ steps.ver.outputs.versionCode }} \
+            -PversionName=${{ steps.ver.outputs.versionName }}
 
       - name: Find and rename APK
         run: |
           echo "Searching for APK files..."
-          find . -name "*.apk" -type f 2>/dev/null
+          find . -name "*.apk" -type f -not -path '*/node_modules/*' 2>/dev/null
           # Prefer release-unsigned, then release, then any
           APK_PATH=$(find . -name "*-release-unsigned.apk" -type f 2>/dev/null | head -1)
           if [ -z "$APK_PATH" ]; then
@@ -264,9 +308,9 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
         run: |
-          # Zipalign
+          # Zipalign with 4-byte boundary (required for APK Signature Scheme v2+)
           $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 pickando-demo.apk pickando-demo-aligned.apk
-          # Sign with apksigner using the release keystore
+          # Sign with apksigner using v2+v3 schemes
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
             --ks "$KEYSTORE_PATH" \
             --ks-pass pass:"$KEYSTORE_PASS" \
@@ -276,25 +320,47 @@ jobs:
             --v3-signing-enabled true \
             --out pickando-demo-signed.apk \
             pickando-demo-aligned.apk
-          # Verify signing
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs pickando-demo-signed.apk
           # Final name
           mv pickando-demo-signed.apk pickando-demo.apk
           ls -la pickando-demo.apk
 
-      - name: Verify APK is NOT signed with debug cert (CN=Android Debug)
+      - name: Verify APK signing (NO debug cert, NOT debuggable)
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
         run: |
           set -e
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs pickando-demo.apk | tee certs.txt
+          echo "=== Signing verification ==="
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs pickando-demo.apk | tee certs.txt
           if grep -q "CN=Android Debug" certs.txt; then
             echo "::error::APK is signed with Android Debug certificate — this will fail to install on real Android 14+ devices. See docs/APK_SIGNING.md"
             exit 1
           fi
           echo "[OK] APK is signed with a non-debug certificate"
-          echo "--- APK contents (first 30 entries) ---"
-          unzip -l pickando-demo.apk | head -30
+
+          echo "=== Manifest verification (NOT debuggable, NOT cleartext) ==="
+          $ANDROID_HOME/build-tools/34.0.0/aapt dump xmltree pickando-demo.apk AndroidManifest.xml > manifest.txt
+          if grep -q "android:debuggable(0x0101000f)=(type 0x12)0xffffffff" manifest.txt; then
+            echo "::error::APK manifest has android:debuggable=true — this is FORBIDDEN in release builds"
+            exit 1
+          fi
+          echo "[OK] Manifest is NOT debuggable"
+
+          echo "=== Icon verification (PNG fallbacks at all densities) ==="
+          $ANDROID_HOME/build-tools/34.0.0/aapt dump resources pickando-demo.apk > resources.txt
+          ICON_COUNT=$(grep -c "mipmap/ic_launcher:" resources.txt || true)
+          if [ "$ICON_COUNT" -lt 6 ]; then
+            echo "::error::Only $ICON_COUNT mipmap/ic_launcher entries found — need at least 6 (anydpi-v26 + 5 PNG densities). Pre-Android 8.0 devices need PNG fallbacks."
+            exit 1
+          fi
+          echo "[OK] $ICON_COUNT ic_launcher mipmap entries present"
+
+          echo "=== APK size ==="
+          ls -la pickando-demo.apk
+          SIZE=$(stat -c %s pickando-demo.apk)
+          if [ "$SIZE" -gt 10485760 ]; then
+            echo "::warning::APK size ($SIZE bytes) exceeds 10MB — may impact install rate on cellular"
+          fi
+          echo "[OK] APK size: $SIZE bytes"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -302,6 +368,17 @@ jobs:
           name: pickando-android-apk
           path: pickando-demo.apk
           retention-days: 90
+
+      - name: Upload signing debug info
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pickando-android-signing-debug
+          path: |
+            certs.txt
+            manifest.txt
+            resources.txt
+          retention-days: 7
 
   # ============================================================
   # Create GitHub Release with ALL artifacts attached
@@ -366,13 +443,26 @@ jobs:
 
             ## 📱 Android APK
 
-            **`pickando-demo.apk`** — App Android firmada con certificado de release (NO debug).
-            Descarga el archivo, transfiérelo a tu dispositivo Android (7.0+),
-            habilita "Instalar apps de origen desconocido" y ábrelo.
-            La app carga la demo en vivo desde el deploy de Railway.
+            **`pickando-demo.apk`** — App Android firmada con certificado de **release** (NO debug).
+            Compatible con Android 7.0+ (API 24+).
 
-            **Importante:** Si tienes una versión previa instalada (v0.5.3 o anterior),
-            desinstálala primero — el certificado de firma cambió de debug a release.
+            ### Cambios en esta versión
+            - ✅ Firma con certificado de release (NO debug) — instala correctamente en Android 14+
+            - ✅ `android:debuggable=false` explícito en manifest
+            - ✅ Iconos PNG en todas las densidades (mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi) + adaptativo (Android 8+)
+            - ✅ Pantalla offline cuando no hay conexión
+            - ✅ Manejo de errores de red en WebView
+            - ✅ `versionCode` bump automático desde el tag
+
+            ### Instalación
+            1. Descarga `pickando-demo.apk`
+            2. Transfiérelo a tu dispositivo Android (7.0+)
+            3. Habilita "Instalar apps de origen desconocido" en Ajustes
+            4. Ábrelo con el gestor de archivos → Instalar
+            5. Si tienes una versión previa (v0.5.3 o anterior), **desinstálala primero**
+               (el certificado de firma cambió de debug a release)
+
+            La app carga la demo en vivo desde el deploy de Railway.
 
             ## 💻 Backend binaries
 
@@ -382,7 +472,7 @@ jobs:
             ## 🌐 Web (WASM)
 
             `pickando-web-wasm.zip` — Static WASM bundle. Descomprime y
-            sírvelo con cualquier servidor HTTP estático (nginx, python -m http.server, etc.)
+            sírvelo con cualquier servidor HTTP estático.
 
             ## 🚀 Quick Start (Backend)
 
