@@ -5,6 +5,87 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] — 2026-06-20
+
+### Summary
+Patch de calidad post-v0.5.5. Desbloquea CI/CD (que falló en run #74 por
+dos `clippy::redundant_closure`), hidrata 44 clases CSS faltantes que
+rompían el layout interno de las páginas showcase del matching engine,
+cablea dos botones muertos en la superficie móvil, corrige el botón
+"Reintentar" del APK offline, y elimina el drift de asset-copy entre
+Dockerfile / ci.yml / release.yml.
+
+### Fixed — CI/CD blocker (commit c24d691)
+- **Bug P0:** el commit 5e3339e falló CI run #74 con dos errores
+  `clippy::redundant_closure` en `platform/driver.rs:22-23` y
+  `platform/passenger.rs:656`. Como CI corre con `-D warnings`, el job
+  Clippy falló y todos los jobs downstream (Tests, Build frontend, Build
+  backend) fueron skipped.
+- **Fix driver.rs:** reemplazar `use_signal(|| std::collections::HashSet::<&'static str>::new())`
+  por `use_signal(std::collections::HashSet::<&'static str>::new)` (referencia
+  a función, no closure).
+- **Fix passenger.rs:** reemplazar `.and_then(|t| t.as_str())` por
+  `.and_then(serde_json::Value::as_str)`.
+
+### Fixed — 44 missing CSS classes (commit c24d691)
+- **Bug HIGH:** un audit `comm -23` entre clases referenciadas en `.rs`
+  y clases definidas en `main.css` reveló 44 clases faltantes. Las
+  páginas `platform/passenger` (showcase del matching engine) y
+  `platform/driver` (gestión de rutas + solicitudes) renderizaban con
+  layout interno roto — las clases `.match-header`, `.match-body`,
+  `.match-scores`, `.route-card`, `.score-track`, `.request-item`,
+  `.ws-demo`, `.empty-state`, `.btn-sm`, `.advanced-filters`, `.yes`,
+  `.partial`, etc. no existían en CSS.
+- **Fix:** se añadió una sección "v0.5.6 — Missing class hydration" al
+  final de `main.css` con las 44 reglas faltantes, usando los design
+  tokens existentes (--ink, --paper, --de-gold, --space-*, --radius-*).
+- **Verificación:** `css_audit.py` reporta missing count 45 → 1 (el 1
+  restante es un falso positivo de `format!()` placeholder).
+
+### Fixed — Dead buttons on mobile surface (commit c24d691)
+- **Bug HIGH:** `mobile/home.rs:155` refresh button tenía `onclick: move |_| {}`
+  (cuerpo vacío). `mobile/driver.rs:193` "Iniciar viaje" CTA no tenía
+  `onclick` en absoluto.
+- **Fix home.rs:** cablear refresh a `refresh_offset` signal que rota el
+  orden de la lista de conductores (visiblemente reordena al click).
+- **Fix driver.rs:** cablear "Iniciar viaje" a `trip_started` signal;
+  muestra "Viaje en curso con N pasajero(s) · demo" tras click.
+
+### Fixed — APK offline retry button (commit c24d691)
+- **Bug HIGH:** `offline.html:74` llamaba `location.reload()` pero la
+  página offline se carga vía `loadDataWithBaseURL('file:///android_asset/')`
+  sin URL real, así que recargaba la página offline en loop infinito en
+  lugar de re-attemptear `APP_URL`.
+- **Fix:** cambiar a `location.href='https://pickando-demo-production.up.railway.app/m/'`
+  para que `WebViewClient.shouldOverrideUrlLoading` cargue la app real.
+
+### Fixed — CI/release asset-copy drift (commit c24d691)
+- **Bug HIGH:** el commit 5e3339e añadió 5 assets faltantes (favicon-16.png,
+  favicon-32.png, apple-touch-icon.png, og-image.png, site.webmanifest) al
+  Dockerfile, pero NO a `ci.yml` Job 7 ni a `release.yml` build-web.
+  El verify step en ci.yml solo chequeaba 4 de 8 archivos — false-positive
+  GREEN.
+- **Fix:** sincronizar el bloque de 8 `cp` + 8 `test -f` entre Dockerfile,
+  ci.yml, y release.yml. Ahora los tres pipelines shippean el mismo set
+  de assets.
+- **Adicional:** añadir `permissions: contents: write, actions: read` al
+  release.yml (least-privilege).
+
+### Verified
+- `cargo fmt --all -- --check`: PASS
+- `cargo clippy --workspace --all-targets -- -D warnings`: PASS (0 warnings)
+- `cargo test --workspace`: 25 backend + 40 shared + 1 doc-test = 66 PASS
+- CI run #75 (commit c24d691): 7/7 jobs green (Format, Clippy, Audit,
+  Deny, Tests, Build frontend, Build backend)
+- Railway auto-redeploy: confirmado (uptime_seconds=120s tras push,
+  todos los 8 assets devuelven 200, las 44 clases CSS están live)
+- Web visual audit (agent-browser): landing, platform/passenger
+  (3 matches renderizados), platform/driver (publish + Aceptar/Rechazar),
+  WebSocket panel (5 live_ticks recibidos), mobile/home (refresh rota
+  conductores: Ana → Carlos → Beatriz), mobile/driver (Aceptar →
+  "Iniciar viaje" CTA aparece), about (tabla de reutilización con
+  Sí/Parcial/No) — todas las páginas sin console errors.
+
 ## [0.5.5] — 2026-06-20
 
 ### Summary
