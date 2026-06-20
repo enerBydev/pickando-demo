@@ -337,6 +337,18 @@ pub fn init_sample_routes() -> Vec<Route> {
 // Security middleware builders
 // ===========================================================================
 
+/// Allow-list of origins permitted in production for cross-origin requests
+/// (CORS) and WebSocket upgrades.
+///
+/// Reused by `build_cors_layer` (for HTTP CORS) and `ws::is_origin_allowed`
+/// (for WebSocket Origin validation). Keeping both checks against the same
+/// list prevents drift: a host allowed for XHR fetch is also allowed for WS,
+/// and vice versa. (Security audit 8-a P2 / A01.)
+pub(crate) const ALLOWED_ORIGINS: &[&str] = &[
+    "https://pickando-demo-production.up.railway.app",
+    "https://pickando-demo.up.railway.app",
+];
+
 /// Build a CORS layer that allows only known origins.
 ///
 /// In production, only the demo's own origin is allowed. In development
@@ -370,12 +382,8 @@ fn build_cors_layer() -> CorsLayer {
             .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
             .allow_credentials(false)
     } else {
-        // Production: allow only the demo's own origin
-        let allowed_origins = [
-            "https://pickando-demo-production.up.railway.app",
-            "https://pickando-demo.up.railway.app",
-        ];
-        let origins: Vec<HeaderValue> = allowed_origins
+        // Production: allow only the demo's own origin (see ALLOWED_ORIGINS).
+        let origins: Vec<HeaderValue> = ALLOWED_ORIGINS
             .iter()
             .filter_map(|o| o.parse().ok())
             .collect();
