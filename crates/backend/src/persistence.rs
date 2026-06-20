@@ -13,6 +13,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+// Note: `tokio::fs::OpenOptions::mode()` is an inherent method on Unix
+// platforms (defined inside `cfg_unix!` in tokio's source), so no trait
+// import is needed to call `.mode(0o600)` below. The method is simply
+// absent on non-Unix targets, which is why the call is gated by
+// `#[cfg(unix)]`.
+
 /// On-disk representation of the persisted state.
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct PersistedState {
@@ -161,7 +167,25 @@ pub async fn persist_state_once(
     let tmp_path = path.with_extension("json.tmp");
 
     // Write + sync the temp file…
+    //
+    // The temp file is created with mode 0o600 (owner-read+write only) on Unix
+    // so that the persisted state — which contains `passenger_name` (free-form
+    // PII) and route data — is not world-readable on shared hosts. The default
+    // umask would leave the file 0o644 (world-readable). See Security audit
+    // 8-a P3 / A02.
+    //
+    // On non-Unix targets (dev on Windows/macOS), `mode()` is unavailable, so
+    // we fall back to `File::create` which uses the platform default.
     {
+        #[cfg(unix)]
+        let file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&tmp_path)
+            .await?;
+        #[cfg(not(unix))]
         let file = tokio::fs::File::create(&tmp_path).await?;
         // Wrap in std file to call sync_all (not yet exposed by tokio::fs::File)
         let std_file = file.into_std().await;
