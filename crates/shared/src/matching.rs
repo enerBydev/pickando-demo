@@ -148,9 +148,14 @@ pub fn find_matching_routes_with_request(
                     let route_ms = crate::models::parse_time_to_ms(&route.departure_time);
                     match route_ms {
                         Some(route_ms) => {
-                            let diff_min = ((route_ms as i64 - passenger_ms as i64) / 60_000).abs();
-                            if diff_min <= time_window {
-                                1.0 - (diff_min as f64 / time_window as f64)
+                            // Float division preserves sub-minute precision (e.g.
+                            // 90s diff → 1.5 min, not 1 min truncated). Smoother
+                            // scoring at minute boundaries.
+                            let diff_min =
+                                ((route_ms as i64 - passenger_ms as i64).abs() as f64) / 60_000.0;
+                            let window_min = time_window as f64;
+                            if diff_min <= window_min {
+                                1.0 - (diff_min / window_min)
                             } else {
                                 0.0
                             }
