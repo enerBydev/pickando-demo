@@ -84,7 +84,8 @@ pub fn MobileDriver() -> Element {
                 div { class: "mobile-search-text", "Origen: Polanco" }
                 button {
                     class: "mobile-search-edit",
-                    aria_label: "Editar origen",
+                    disabled: true,
+                    aria_label: "Editar origen (demo — botón decorativo)",
                     "EDITAR"
                 }
             }
@@ -93,7 +94,8 @@ pub fn MobileDriver() -> Element {
                 div { class: "mobile-search-text", "Destino: Centro CDMX" }
                 button {
                     class: "mobile-search-edit",
-                    aria_label: "Editar destino",
+                    disabled: true,
+                    aria_label: "Editar destino (demo — botón decorativo)",
                     "EDITAR"
                 }
             }

@@ -94,7 +94,8 @@ pub fn MobileHome() -> Element {
                 div { class: "mobile-search-text", "Av. Reforma 247, CDMX" }
                 button {
                     class: "mobile-search-edit",
-                    aria_label: "Editar origen",
+                    disabled: true,
+                    aria_label: "Editar origen (demo — botón decorativo)",
                     "EDITAR"
                 }
             }
@@ -103,7 +104,8 @@ pub fn MobileHome() -> Element {
                 div { class: "mobile-search-text muted", "¿Hacia dónde vas?" }
                 button {
                     class: "mobile-search-edit",
-                    aria_label: "Agregar destino",
+                    disabled: true,
+                    aria_label: "Agregar destino (demo — botón decorativo)",
                     "+"
                 }
             }

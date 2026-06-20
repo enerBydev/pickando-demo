@@ -2259,6 +2259,21 @@ input, textarea, select { font-family: inherit; }
     background: var(--fog);
 }
 
+/* Decorative demo buttons — visually dimmed, no hover/active feedback */
+.mobile-search-edit:disabled,
+.mobile-search-edit[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.mobile-search-edit:disabled:hover,
+.mobile-search-edit[disabled]:hover,
+.mobile-search-edit:disabled:active,
+.mobile-search-edit[disabled]:active {
+    background: transparent;
+    color: var(--graphite);
+}
+
 .mobile-map {
     height: 160px;
     border-radius: var(--radius-md);
