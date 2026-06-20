@@ -653,7 +653,7 @@ fn WebSocketDemo() -> Element {
                         let label = match serde_json::from_str::<serde_json::Value>(&text) {
                             Ok(v) => v
                                 .get("type")
-                                .and_then(|t| t.as_str())
+                                .and_then(serde_json::Value::as_str)
                                 .unwrap_or("unknown")
                                 .to_string(),
                             Err(_) => "raw".to_string(),

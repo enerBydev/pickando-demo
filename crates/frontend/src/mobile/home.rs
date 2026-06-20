@@ -68,8 +68,17 @@ const DRIVERS: &[DriverInfo] = &[
 pub fn MobileHome() -> Element {
     // Selected driver index — None means no selection
     let mut selected = use_signal(|| Option::<usize>::None);
+    // Rotation offset for the refresh button — gives visible feedback
+    // that the button does something (simulates "fetching new drivers").
+    let mut refresh_offset = use_signal(|| 0usize);
 
     let selected_price = selected().map(|i| DRIVERS[i].price).unwrap_or(32);
+    let driver_count = DRIVERS.len();
+    // Build rotated index list so the refresh button visibly reorders drivers.
+    // refresh_offset is read at render time — recomputed each render.
+    let rotated_indices: Vec<usize> = (0..driver_count)
+        .map(|i| (i + refresh_offset()) % driver_count)
+        .collect();
 
     rsx! {
         // Status pill — explicit "live" indicator
@@ -147,32 +156,34 @@ pub fn MobileHome() -> Element {
         div { class: "mobile-drivers-head",
             div { class: "mobile-drivers-title", "Conductores cercanos" }
             div { style: "display:flex; align-items:center; gap:8px;",
-                div { class: "mobile-drivers-count new", "{DRIVERS.len()} DISPONIBLES" }
+                div { class: "mobile-drivers-count new", "{driver_count} DISPONIBLES" }
                 button {
                     class: "mobile-refresh",
                     aria_label: "Actualizar lista de conductores",
                     title: "Actualizar",
                     onclick: move |_| {
-                        // Visual feedback via :active CSS rotation.
-                        // In a real app this would refetch from the backend.
+                        // Rotate the driver list — gives visible feedback
+                        // that the refresh did something (simulates a refetch).
+                        refresh_offset.set((refresh_offset() + 1) % driver_count.max(1));
                     },
                     IconRefresh { size: 16 }
                 }
             }
         }
 
-        // Driver list — clickable to select
-        for (i, d) in DRIVERS.iter().enumerate() {
+        // Driver list — clickable to select. Rotation makes the refresh
+        // button visibly reorder the list (matches the module doc claim).
+        for (orig_idx, d) in rotated_indices.iter().map(|&idx| (idx, &DRIVERS[idx])) {
             button {
-                class: if selected() == Some(i) {
+                class: if selected() == Some(orig_idx) {
                     "mobile-driver selected"
                 } else {
                     "mobile-driver"
                 },
-                key: "{i}",
+                key: "{orig_idx}",
                 aria_label: "Seleccionar a {d.name} por ${d.price}",
                 onclick: move |_| {
-                    selected.set(Some(i));
+                    selected.set(Some(orig_idx));
                 },
                 div { class: "mobile-driver-avatar", "{d.initials}" }
                 div { class: "mobile-driver-info",

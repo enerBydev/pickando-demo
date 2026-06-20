@@ -10,6 +10,13 @@ on:
         required: true
         default: 'v0.1.0'
 
+# Least-privilege permissions for the default GITHUB_TOKEN.
+# Release workflow needs `contents: write` to create GitHub Releases
+# and upload assets. All other scopes default to none.
+permissions:
+  contents: write
+  actions: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -130,15 +137,31 @@ jobs:
       - name: Build frontend (web)
         run: cd crates/frontend && dx build --platform web --release
 
-      - name: Copy main.css to build output
+      - name: Copy assets to build output
         run: |
           DIST_DIR="target/dx/pickando-frontend/release/web/public"
           mkdir -p "$DIST_DIR/assets"
+          # Dioxus 0.7 does NOT copy these assets to the build output even
+          # though index.html references them. We must copy all 8 manually
+          # (kept in sync with Dockerfile lines 81-97).
           cp crates/frontend/assets/main.css "$DIST_DIR/assets/main.css"
           cp crates/frontend/assets/favicon.svg "$DIST_DIR/assets/favicon.svg"
+          cp crates/frontend/assets/watchdog.js "$DIST_DIR/assets/watchdog.js"
+          cp crates/frontend/assets/favicon-16.png "$DIST_DIR/assets/favicon-16.png"
+          cp crates/frontend/assets/favicon-32.png "$DIST_DIR/assets/favicon-32.png"
+          cp crates/frontend/assets/apple-touch-icon.png "$DIST_DIR/assets/apple-touch-icon.png"
+          cp crates/frontend/assets/og-image.png "$DIST_DIR/assets/og-image.png"
+          cp crates/frontend/assets/site.webmanifest "$DIST_DIR/assets/site.webmanifest"
+          # Verify all 8 assets present (fail loudly if any missing)
           test -f "$DIST_DIR/index.html"
           test -f "$DIST_DIR/assets/main.css"
           test -f "$DIST_DIR/assets/favicon.svg"
+          test -f "$DIST_DIR/assets/watchdog.js"
+          test -f "$DIST_DIR/assets/favicon-16.png"
+          test -f "$DIST_DIR/assets/favicon-32.png"
+          test -f "$DIST_DIR/assets/apple-touch-icon.png"
+          test -f "$DIST_DIR/assets/og-image.png"
+          test -f "$DIST_DIR/assets/site.webmanifest"
           test -n "$(find "$DIST_DIR" -name '*.wasm')"
           echo "=== Build output ==="
           ls -la "$DIST_DIR"

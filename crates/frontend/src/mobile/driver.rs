@@ -59,6 +59,8 @@ pub fn MobileDriver() -> Element {
     // Track each passenger's accept/reject state. Default = Pending.
     // Use a Vec<PassengerState> aligned with REQUESTS by index.
     let mut states = use_signal(|| vec![PassengerState::Pending; REQUESTS.len()]);
+    // Track whether the driver has started the trip (CTA feedback)
+    let mut trip_started = use_signal(|| false);
 
     let pending_count = states()
         .iter()
@@ -188,10 +190,21 @@ pub fn MobileDriver() -> Element {
         }
 
         // CTA — only show if at least one passenger accepted
-        {if accepted_count > 0 {
+        {if trip_started() {
             rsx! {
                 button {
                     class: "mobile-cta",
+                    disabled: true,
+                    "Viaje en curso con {accepted_count} pasajero(s) · demo"
+                }
+            }
+        } else if accepted_count > 0 {
+            rsx! {
+                button {
+                    class: "mobile-cta",
+                    onclick: move |_| {
+                        trip_started.set(true);
+                    },
                     "Iniciar viaje con {accepted_count} pasajero(s)"
                     span { "→" }
                 }

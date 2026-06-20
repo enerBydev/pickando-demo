@@ -19,8 +19,8 @@ pub fn DriverPage() -> Element {
     let mut error_msg = use_signal(String::new);
     let mut success_msg = use_signal(String::new);
     let mut my_routes = use_signal(Vec::<Route>::new);
-    let mut accepted_request = use_signal(|| std::collections::HashSet::<&'static str>::new());
-    let mut rejected_request = use_signal(|| std::collections::HashSet::<&'static str>::new());
+    let mut accepted_request = use_signal(std::collections::HashSet::<&'static str>::new);
+    let mut rejected_request = use_signal(std::collections::HashSet::<&'static str>::new);
 
     // Auto-load my routes on mount
     use_effect(move || {

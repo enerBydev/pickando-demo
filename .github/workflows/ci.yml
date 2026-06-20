@@ -219,20 +219,38 @@ jobs:
         run: cargo install dioxus-cli --version 0.7.9 --locked
       - name: Build frontend for web
         run: cd crates/frontend && dx build --platform web --release
-      - name: Copy main.css to build output
+      - name: Copy assets to build output
         run: |
           DIST_DIR="target/dx/pickando-frontend/release/web/public"
           mkdir -p "$DIST_DIR/assets"
+          # Dioxus 0.7 does NOT copy these assets to the build output even
+          # though index.html references them. We must copy all 8 manually
+          # (kept in sync with Dockerfile lines 81-97 and release.yml).
           cp crates/frontend/assets/main.css "$DIST_DIR/assets/main.css"
           cp crates/frontend/assets/favicon.svg "$DIST_DIR/assets/favicon.svg"
+          cp crates/frontend/assets/watchdog.js "$DIST_DIR/assets/watchdog.js"
+          cp crates/frontend/assets/favicon-16.png "$DIST_DIR/assets/favicon-16.png"
+          cp crates/frontend/assets/favicon-32.png "$DIST_DIR/assets/favicon-32.png"
+          cp crates/frontend/assets/apple-touch-icon.png "$DIST_DIR/assets/apple-touch-icon.png"
+          cp crates/frontend/assets/og-image.png "$DIST_DIR/assets/og-image.png"
+          cp crates/frontend/assets/site.webmanifest "$DIST_DIR/assets/site.webmanifest"
       - name: Verify dist contains expected files
         run: |
           DIST_DIR="target/dx/pickando-frontend/release/web/public"
+          # Verify all 8 assets + index.html + WASM bundle present.
+          # Fail loudly if any is missing — this catches asset-copy drift
+          # between the Dockerfile, release.yml, and ci.yml.
           test -f "$DIST_DIR/index.html"
           test -f "$DIST_DIR/assets/main.css"
           test -f "$DIST_DIR/assets/favicon.svg"
+          test -f "$DIST_DIR/assets/watchdog.js"
+          test -f "$DIST_DIR/assets/favicon-16.png"
+          test -f "$DIST_DIR/assets/favicon-32.png"
+          test -f "$DIST_DIR/assets/apple-touch-icon.png"
+          test -f "$DIST_DIR/assets/og-image.png"
+          test -f "$DIST_DIR/assets/site.webmanifest"
           test -n "$(find "$DIST_DIR" -name '*.wasm')"
-          echo "WASM bundle OK at $DIST_DIR"
+          echo "WASM bundle + all 8 assets OK at $DIST_DIR"
       - uses: actions/upload-artifact@v4
         with:
           name: pickando-frontend-web
