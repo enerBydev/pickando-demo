@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::{routing::get, routing::post, Router};
 use pickando_shared::matching::encode_geohash;
 use pickando_shared::models::Route;
@@ -6,6 +7,7 @@ use std::time::Instant;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -86,9 +88,7 @@ async fn main() {
     // - X-Frame-Options: DENY → prevents clickjacking
     // - Referrer-Policy → limits referrer leakage
     // - Permissions-Policy → disables risky browser APIs
-    use axum::extract::DefaultBodyLimit;
     use axum::http::{header, HeaderValue};
-    use tower_http::set_header::SetResponseHeaderLayer;
 
     let app = Router::new()
         .merge(api_routes)
