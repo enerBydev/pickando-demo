@@ -72,14 +72,10 @@ pub fn MobileDriver() -> Element {
         .count();
 
     rsx! {
-        // Status pill — explicit "live" indicator
+        // Status pill — demo indicator (data is simulated, no live route is published)
         div { class: "mobile-status-pill",
-            span { class: "mobile-status-pill-dot live" }
-            {if accepted_count > 0 {
-                format!("Ruta publicada · {accepted_count} aceptado(s) · {pending_count} pendiente(s)")
-            } else {
-                format!("Ruta publicada · {pending_count} solicitudes activas")
-            }}
+            span { class: "mobile-status-pill-dot" }
+            "Demo · datos simulados"
         }
 
         div { class: "mobile-search",
