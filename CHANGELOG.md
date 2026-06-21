@@ -5,6 +5,144 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] — 2026-06-21
+
+### Summary
+Quality pass post-v0.5.6. Despliega 4 Agent Teams en paralelo (frontend,
+backend, matching, verification) para cerrar todos los findings pendientes
+de los audits previos (Tasks 8-a, 8-c, A2, A4, MAIN-LOOP-1). Resultado:
+22 fixes surgicos en 3 branches (frontend, backend, matching), +10 tests
+(66 → 76), 0 clippy warnings, 0 fmt drift, CI green en run #77.
+
+### Fixed — Backend hardening (7 fixes, branch polish/backend-v0.5.7)
+
+1. **HIGH — `/m/` and `/app` return HTTP 200** (commit b805df9)
+   Antes: cualquier sub-ruta SPA (`/app/passenger`, `/m/driver`) devolvía
+   HTTP 404 con el body de index.html. Ahora: SPA fallback explícito
+   devuelve 200 + index.html para cualquier GET sin extensión. SEO
+   crawlers, uptime monitors y Playwright-based checks reportan 200.
+
+2. **MEDIUM — Origin header validation on WebSocket** (commit 9088d90)
+   Antes: cualquier website podía `new WebSocket('wss://...')` y observar
+   todos los broadcasts. Ahora: el handler rechaza upgrades cuyo Origin
+   no esté en el allow-list (mismos orígenes que CORS). Dev mode
+   (`PICKANDO_DEV=1`) skip el check para curl-based tests.
+
+3. **MEDIUM — Generic serde error responses** (commit 0be343a)
+   Antes: los errores de deserialización exponían nombres internos de
+   campos (`missing field passenger_lat at line 1 column 24`). Ahora:
+   respuesta genérica `"invalid request body"`, error completo logueado
+   server-side con `tracing::warn!`. Reduce information leakage (OWASP
+   A07).
+
+4. **LOW — `DefaultBodyLimit::max(64 * 1024)` explicit** (commit 0188067)
+   Axum default era 2MB; demo payload legítimo es ~300B. 64KB es generous
+   y previene memory-exhaustion DoS.
+
+5. **LOW — `persistence.rs` file mode 0o600** (commit fe63a03)
+   Antes: state.json se escribía con umask 0644 — cualquier proceso del
+   container podía leer `passenger_name` (PII). Ahora: 0o600 via
+   `tokio::os::unix::fs::OpenOptionsExt` en Unix.
+
+6. **LOW — CSP `connect-src` tightened** (commit 5966157)
+   Antes: `connect-src 'self' ws: wss:` permitía WS egress a cualquier
+   host. Ahora en prod: `connect-src 'self' wss://pickando-demo-production.up.railway.app`
+   (único host WS del demo). Dev mode (`PICKANDO_DEV=1`) usa `ws: wss:`
+   para localhost.
+
+7. **LOW — Conditional JSON logs** (commit a2b28e4)
+   Antes: `tracing_subscriber::fmt()` sin opción JSON. Ahora: si
+   `RUST_LOG_JSON=1` env var está seteada, usa `.json()` para logs
+   estructurados (compatible con Axiom/Logtail/Grafana Cloud). Default
+   sigue siendo pretty logs para dev local.
+
+### Fixed — Matching engine correctness (6 fixes, branch polish/matching-v0.5.7)
+
+1. **HIGH — Unified `find_matching_routes` entry points** (commit 78844e1)
+   Antes: `find_matching_routes` (simple) usaba stubs que siempre
+   retornaban 1.0 para direction y time. `find_matching_routes_with_request`
+   (full) usaba las implementaciones reales. Mismo route recibía scores
+   distintos dependiendo de si el pasajero pasó `passenger_bearing_deg`.
+   Ahora: ambas rutas usan la misma lógica de scoring. Si el pasajero no
+   pasa bearing/time, esos componentes se omiten del score (no se
+   substituyen por 1.0). Comportamiento consistente y predecible.
+
+2. **LOW — Float division for sub-minute time precision** (commit 1a6ef45)
+   Antes: `(route_ms as i64 - passenger_ms as i64) / 60_000` era integer
+   division — 90s → 1 min (truncado, no 1.5). Ahora: `as f64 / 60_000.0`
+   para precisión sub-minuto. Scoring más suave en boundaries de minuto.
+
+3. **LOW — CDMX→Guadalajara reference distance test** (commit 41a4886)
+   Nuevo test `haversine_cdmx_to_guadalajara_approx_460km` documenta la
+   corrección de haversine a escala México (~460 km CDMX↔GDL).
+
+4. **LOW — Direction weight documentation** (commit b6d1737)
+   Doc comment en `find_matching_routes_with_request` explica la elección
+   0.5/0.3/0.2 y cómo tunear para producción (A/B test contra booking
+   conversion).
+
+5. **LOW — Bench exercises match-success path** (commit d2262dd)
+   Antes: el bench solo ejercitaba el filter path. Ahora: nuevo caso
+   bench que llama `find_matching_routes_with_request` con un request
+   que sí matchea un candidate — mide el path completo de scoring.
+
+6. **LOW — `time_window_minutes` validation in handler** (commit e3cfcfa)
+   Antes: el handler no validaba `time_window_minutes` (solo lo clampaba
+   a [1, 480] en `sanitized()`). Ahora: validación explícita en
+   `find_matches` con 422 + mensaje claro para valores fuera de rango.
+   3 tests nuevos: 0, 481, -30.
+
+### Fixed — Frontend polish (9 fixes, branch polish/frontend-v0.5.7)
+
+1. **MEDIUM — Mobile driver status pill** (commit 2fd8cb1)
+   Antes: "Ruta publicada · X solicitudes activas" con live dot (misleading
+   — no hay ruta publicada, X viene de hardcoded const). Ahora: "Demo ·
+   datos simulados" sin live dot.
+
+2. **MEDIUM — `--silver` AAA contrast** (commit 485407a)
+   Antes: `#6E6E6E` (4.96:1, fails AAA). Ahora: `#4A4A4A` (8.6:1, AAA
+   pass) en main.css.
+
+3. **MEDIUM — Decorative buttons disabled (WCAG 2.1.1)** (commit bbf4c4b)
+   6 botones decorativos (EDITAR/CAMBIAR/+) ahora tienen `disabled: true`
+   + styling `:disabled` (opacity 0.5, cursor not-allowed). Antes parecían
+   interactivos pero no hacían nada — violación WCAG.
+
+4. **LOW — Watchdog console.log cleanup** (commit 25901a7)
+   Deleted leftover `console.log('[Nitheky] App mounted in ...')`.
+
+5. **LOW — Tracing comment accuracy** (commit 895d600)
+   Comment en main.rs ahora dice "tracing intentionally disabled — would
+   add ~30KB to WASM bundle for a demo" en lugar de claim falso de que
+   tracing estaba inicializado.
+
+6. **LOW — Redundant onclick removed** (commit 86ed292)
+   `platform/home.rs:36` tenía `onclick: move |_| {}` en un Link — el
+   Link maneja navegación, onclick era redundante.
+
+7. **LOW — Duplicate CSS load removed** (commit f61fc69)
+   main.rs:88 cargaba `/assets/main.css` además de index.html:248.
+   Eliminado el duplicate en main.rs.
+
+8. **LOW — Generic user-facing API errors** (commit c6a64df)
+   Antes: errores del backend se mostraban verbatim en alerts al usuario.
+   Ahora: helper `log_err(context, e)` loguea el body completo a console
+   y muestra "No pudimos completar la operación. Reintentar." al
+   usuario. 6 call sites en platform/{passenger,driver}.rs actualizados.
+
+9. **LOW — `env(safe-area-inset-top)` for Android WebView** (commit c791a37)
+   En viewport 412px el brand text "Nitheky" se cropped a "Cheky" porque
+   MainActivity usa `SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN`. Ahora: `.mobile-header`
+   tiene `top: env(safe-area-inset-top)` con fallback `max(env(), 24px)`
+   en `@media (max-width: 600px)` para Android WebView (donde env()=0).
+
+### Verified
+- `cargo fmt --all -- --check`: PASS
+- `cargo clippy --workspace --all-targets -- -D warnings`: PASS (0 warnings)
+- `cargo test --workspace`: 34 backend + 41 shared + 1 doctest = **76 PASS** (+10 desde v0.5.6)
+- Local merges: 3 branches merged sequentially with `--no-ff`, no conflicts
+- Helder message URLs verified: 6/6 return 200 (or WS upgrade OK)
+
 ## [0.5.6] — 2026-06-20
 
 ### Summary
