@@ -125,8 +125,11 @@ async fn main() {
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
             "content-security-policy".parse().unwrap(),
-            // CSP: only allow resources from same origin + Google Fonts (for Inter
-            // and JetBrains Mono) + data: URLs (for inline SVG).
+            // Build CSP at runtime so connect-src can be tightened in production
+            // (only the production wss:// host is allowed) while staying
+            // permissive in dev mode (ws://localhost:* and ws://127.0.0.1:*
+            // for local frontend hot-reload + curl-based WS smoke tests).
+            // (Security audit 8-a P2 / A05.)
             //
             // CRITICAL: `script-src 'wasm-unsafe-eval'` is REQUIRED for Dioxus to
             // compile/instantiate its WASM bundle. Without it, Chrome/Firefox throw
@@ -140,17 +143,7 @@ async fn main() {
             //
             // 'unsafe-inline' on style-src is required because Dioxus injects inline
             // style attributes on elements (e.g., `style="color: var(--ink)"`).
-            HeaderValue::from_static(
-                "default-src 'self'; \
-                 script-src 'self' 'wasm-unsafe-eval'; \
-                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
-                 font-src 'self' https://fonts.gstatic.com data:; \
-                 img-src 'self' data: https:; \
-                 connect-src 'self' ws: wss:; \
-                 frame-ancestors 'none'; \
-                 base-uri 'self'; \
-                 form-action 'self'",
-            ),
+            csp_value(),
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
             // HSTS: only meaningful over HTTPS, but we set it on all responses.
@@ -348,6 +341,43 @@ pub(crate) const ALLOWED_ORIGINS: &[&str] = &[
     "https://pickando-demo-production.up.railway.app",
     "https://pickando-demo.up.railway.app",
 ];
+
+/// Build the Content-Security-Policy header value at runtime.
+///
+/// The policy is identical in dev and prod EXCEPT for `connect-src`:
+/// - Production: `connect-src 'self' wss://pickando-demo-production.up.railway.app`
+///   (the only WS host the demo needs; previously was the wide-open
+///   `connect-src 'self' ws: wss:` which allowed WS egress to ANY host —
+///   Security audit 8-a P2 / A05).
+/// - Dev (`PICKANDO_DEV=1`): `connect-src 'self' ws: wss:` is kept
+///   permissive so local frontend hot-reload and curl-based WS smoke
+///   tests against `ws://localhost:*` and `ws://127.0.0.1:*` work
+///   without enumeration.
+///
+/// `script-src 'wasm-unsafe-eval'` is REQUIRED for Dioxus (see inline
+/// comment at the call site). 'unsafe-inline' on style-src is required
+/// because Dioxus injects inline style attributes.
+fn csp_value() -> axum::http::HeaderValue {
+    use axum::http::HeaderValue;
+    let is_dev = std::env::var("PICKANDO_DEV").unwrap_or_default() == "1";
+    let connect_src = if is_dev {
+        "connect-src 'self' ws: wss:"
+    } else {
+        "connect-src 'self' wss://pickando-demo-production.up.railway.app"
+    };
+    let csp = format!(
+        "default-src 'self'; \
+         script-src 'self' 'wasm-unsafe-eval'; \
+         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+         font-src 'self' https://fonts.gstatic.com data:; \
+         img-src 'self' data: https:; \
+         {connect_src}; \
+         frame-ancestors 'none'; \
+         base-uri 'self'; \
+         form-action 'self'"
+    );
+    HeaderValue::from_str(&csp).expect("CSP header value must be valid ASCII")
+}
 
 /// Build a CORS layer that allows only known origins.
 ///
