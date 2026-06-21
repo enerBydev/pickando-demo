@@ -41,7 +41,10 @@ pub fn PassengerPage() -> Element {
                     all_routes.set(data);
                     status_msg.set(format!("{count} rutas cargadas desde el backend"));
                 }
-                Err(e) => error_msg.set(format!("No se pudieron cargar rutas: {e}")),
+                Err(e) => {
+                    api::log_err("cargar rutas", &e);
+                    error_msg.set("No pudimos completar la operación. Reintentar.".to_string());
+                }
             }
         });
     });
@@ -360,7 +363,12 @@ pub fn PassengerPage() -> Element {
                                         }
                                     }
                                 }
-                                Err(e) => error_msg.set(format!("Error en búsqueda: {e}")),
+                                Err(e) => {
+                                    api::log_err("búsqueda match", &e);
+                                    error_msg.set(
+                                        "No pudimos completar la operación. Reintentar.".to_string(),
+                                    );
+                                }
                             }
                             loading.set(false);
                         },
@@ -466,7 +474,13 @@ pub fn PassengerPage() -> Element {
                                                                 req.id
                                                             ));
                                                         }
-                                                        Err(e) => error_msg.set(format!("Error: {e}")),
+                                                        Err(e) => {
+                                                            api::log_err("solicitar unirme", &e);
+                                                            error_msg.set(
+                                                                "No pudimos completar la operación. Reintentar."
+                                                                    .to_string(),
+                                                            );
+                                                        }
                                                     }
                                                 }
                                             },
@@ -509,7 +523,12 @@ pub fn PassengerPage() -> Element {
                                     all_routes.set(data);
                                     status_msg.set(format!("{count} rutas cargadas"));
                                 }
-                                Err(e) => error_msg.set(format!("Error: {e}")),
+                                Err(e) => {
+                                    api::log_err("recargar rutas", &e);
+                                    error_msg.set(
+                                        "No pudimos completar la operación. Reintentar.".to_string(),
+                                    );
+                                }
                             }
                             loading.set(false);
                         },

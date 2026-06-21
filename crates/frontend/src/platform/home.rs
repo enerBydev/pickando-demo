@@ -33,7 +33,6 @@ pub fn PlatformHome() -> Element {
                 // Card 1: Passenger
                 div {
                     class: "platform-card",
-                    onclick: move |_| {},
                     Link { to: PlatformTab::Passenger.to_route(),
                         div { style: "display: contents;",
                             div { class: "platform-card-icon",

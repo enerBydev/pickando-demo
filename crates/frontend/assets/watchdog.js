@@ -57,7 +57,6 @@
         setTimeout(function () {
             if (loadingScreen.parentNode) loadingScreen.parentNode.removeChild(loadingScreen);
         }, 400);
-        console.log('[Nitheky] App mounted in ' + (Date.now() - startTime) + 'ms');
     }
 
     if (typeof WebAssembly === 'undefined') {

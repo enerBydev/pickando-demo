@@ -79,7 +79,8 @@ pub fn MobilePassenger() -> Element {
                 div { class: "mobile-search-text", "Mi ubicación actual" }
                 button {
                     class: "mobile-search-edit",
-                    aria_label: "Cambiar ubicación de origen",
+                    disabled: true,
+                    aria_label: "Cambiar ubicación de origen (demo — botón decorativo)",
                     "CAMBIAR"
                 }
             }
@@ -88,7 +89,8 @@ pub fn MobilePassenger() -> Element {
                 div { class: "mobile-search-text muted", "Destino" }
                 button {
                     class: "mobile-search-edit",
-                    aria_label: "Agregar destino",
+                    disabled: true,
+                    aria_label: "Agregar destino (demo — botón decorativo)",
                     "+"
                 }
             }

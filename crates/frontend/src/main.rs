@@ -34,9 +34,7 @@ mod platform;
 use dioxus::prelude::*;
 
 fn main() {
-    // Initialize tracing for the frontend (WASM-compatible via tracing-wasm
-    // if enabled; otherwise no-op). This is the Level 7 (Observability)
-    // hook — all components can `tracing::info!()` / `tracing::error!()`.
+    // tracing intentionally disabled — would add ~30KB to WASM bundle for a demo. Use browser devtools console instead.
     dioxus::launch(App);
 }
 
@@ -85,7 +83,6 @@ enum Route {
 #[component]
 fn App() -> Element {
     rsx! {
-        document::Link { rel: "stylesheet", href: "/assets/main.css" }
         document::Link { rel: "preconnect", href: "https://fonts.googleapis.com" }
         document::Link { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "true" }
         document::Link {
