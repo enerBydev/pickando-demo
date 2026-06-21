@@ -23,13 +23,23 @@ use state::AppState;
 async fn main() {
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::fmt()
+    // Initialize tracing. If `RUST_LOG_JSON=1` is set in the environment
+    // (e.g. via Railway vars), emit structured JSON logs suitable for log
+    // aggregators like Axiom, Logtail, or Grafana Cloud. Otherwise, emit
+    // human-readable pretty logs for local dev.
+    // (SRE audit 8-c quick win #1; the `json` feature is already enabled in
+    // the workspace tracing-subscriber dependency.)
+    let subscriber = tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("pickando=info,tower_http=info")),
         )
-        .with_target(false)
-        .init();
+        .with_target(false);
+    if std::env::var("RUST_LOG_JSON").ok().as_deref() == Some("1") {
+        subscriber.json().init();
+    } else {
+        subscriber.init();
+    }
 
     let start_time = Instant::now();
 
