@@ -5,6 +5,92 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] — 2026-06-21
+
+### Summary
+**CRITICAL FIX** — APK signing keystore persistence. Resuelve
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE` reportado por un usuario al
+intentar actualizar desde v0.5.5/v0.5.6/v0.5.7 a v0.5.7. Cada release
+previo era firmado con un keystore CI efímero NUEVO (4 SHA-256 distintos
+en 4 releases), causando que Android rechazara upgrades. Esta versión
+introduce keystore persistente vía GitHub Actions secret
+`ANDROID_KEYSTORE_BASE64` + hard-fail si no está configurado.
+
+### Diagnóstico (verificado por Agent Team 1)
+
+| Versión | SHA-256 cert | Tipo |
+|---------|--------------|------|
+| v0.5.3 | `e3f543eacc6b...` | DEBUG cert (CN=Android Debug) |
+| v0.5.5 | `ef537553bc37...` | CI ephemeral (alias CI-RELEASE) |
+| v0.5.6 | `f26596d1b511...` | CI ephemeral (alias CI-RELEASE) |
+| v0.5.7 | `3a1c540fb6c7...` | CI ephemeral (alias CI-RELEASE) |
+| **v0.5.8+** | **`bc34ceafdbba...`** | **PERSISTENT (alias pickando-release)** |
+
+A partir de v0.5.8, todos los releases comparten el mismo SHA-256
+(`bc34ceafdbbaed00ca328733cdf7321b009022720203984a4885d0b8ef3cd05e`),
+permitiendo upgrades sin desinstalar.
+
+### Fixed — APK signing pipeline (3 fixes)
+
+1. **CRITICAL — Persistent release keystore** (release.yml)
+   - Generado keystore RSA-4096 con validity 10000 días, alias
+     `pickando-release`, DN `CN=Pickando Demo, O=enerBydev, C=AR`.
+   - Configurado como GitHub Actions secret `ANDROID_KEYSTORE_BASE64`
+     (+ 3 secrets auxiliares: `ANDROID_KEYSTORE_PASSWORD`,
+     `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`).
+   - Todos los releases futuros usan este keystore → mismo SHA-256 →
+     upgrades instalan sin conflicto.
+
+2. **HIGH — Hard-fail on missing keystore secret** (release.yml)
+   Antes: si `ANDROID_KEYSTORE_BASE64` no estaba seteado, el workflow
+   generaba un keystore efímero con `::warning::` (fácil de perder).
+   Ahora: `::error::` + `exit 1` explícito. Solo bypass vía
+   `workflow_dispatch` con input `allow_ephemeral_keystore=true`.
+   Verificación adicional: `keytool -list` valida que el password
+   del keystore sea correcto antes de proceder al sign.
+
+3. **MEDIUM — Explicit v1+v2+v3 signing** (release.yml)
+   Antes: apksigner solo seteaba `--v2-signing-enabled true
+   --v3-signing-enabled true` (v1 era default pero implícito).
+   Ahora: `--v1-signing-enabled true --v2-signing-enabled true
+   --v3-signing-enabled true` explícito. ADR-0011 enmendado para
+   reflejar que el APK está firmado con los 3 schemes.
+
+### Added — Observability + docs
+
+4. **NEW — "Print final APK signing cert" CI step** (release.yml)
+   Nuevo step que imprime el SHA-256 del certificado final al log de
+   CI, permitiendo verificar cross-release que el keystore persistente
+   se está usando correctamente.
+
+5. **NEW — `docs/APK_SIGNING.md`** (177 líneas)
+   Guía completa: por qué importa la firma persistente, cómo funciona
+   el pipeline de CI, cómo generar un keystore nuevo, cómo agregar los
+   4 secrets a GitHub, cómo verificar firma localmente, runbook para
+   usuarios que reporten "conflicto con un paquete".
+
+6. **UPDATED — `README.md`** + **ADR-0011** + **release.yml install notes**
+   Callout ⚠️ en README explicando migración v0.5.7→v0.5.8.
+   ADR-0011 enmendado: marca keystore persistente como mandatorio,
+   CI-fallback deprecado. Release body actualizado con instrucción
+   "desinstalar v0.5.7 o anterior primero".
+
+### Verified
+- `cargo fmt --all -- --check`: PASS
+- `cargo clippy --workspace --all-targets -- -D warnings`: PASS (0 warnings)
+- `cargo test --workspace`: 76 PASS (sin cambios desde v0.5.7)
+- YAML validation: PASS (release.yml parsea, 5 jobs, 2 inputs)
+- Keystore local verification: PASS (keytool -list con password correcto)
+- Local APK sign test: PASS (v0.5.7 APK re-signed con keystore persistente,
+  apksigner verify pasa, SHA-256 = bc34ceaf...)
+
+### Migration notes para usuarios existentes
+**Helder (y cualquier usuario con v0.5.3 a v0.5.7 instalada):**
+1. Desinstalar la versión actual (Settings → Apps → Pickando → Uninstall)
+2. Descargar v0.5.8 desde https://github.com/enerbydev/pickando-demo/releases/latest
+3. Instalar fresca
+4. A partir de v0.5.8, todos los upgrades futuros instalan sin desinstalar
+
 ## [0.5.7] — 2026-06-21
 
 ### Summary
