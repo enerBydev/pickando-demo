@@ -1,10 +1,14 @@
 # ADR-0011: Release APK signing — RSA 4096 non-debug cert + CI post-build verification
 
-- **Estado:** Accepted
-- **Fecha:** 2026-06-20
+- **Estado:** Accepted (amended v0.5.8)
+- **Fecha:** 2026-06-20 (amendado 2026-06-21)
 - **Deciders:** René Mendoza (enerBydev)
 - **Tags:** android, ci, security, release, signing
-- **Commits relacionados:** `4968fe1`, `43f1ceb`
+- **Commits relacionados:** `4968fe1`, `43f1ceb`, `<v0.5.8 amend>`
+- **Amend v0.5.8:** Persistent release keystore via
+  `ANDROID_KEYSTORE_BASE64` secret; signing scheme corrected to
+  v1+v2+v3 (apksigner enables v1 by default); CI-fallback keystore
+  deprecated. See `docs/APK_SIGNING.md` for the operational runbook.
 
 ## Contexto
 
@@ -35,14 +39,20 @@ release.
 
 Tres reglas, todas enforced en `.github/workflows/release.yml`:
 
-### 1. Firma con certificado no-debug, RSA 4096, esquemas v2 + v3
+### 1. Firma con certificado no-debug, RSA 4096, esquemas v1 + v2 + v3
 
 `android/app/build.gradle` define `signingConfigs.release` que lee
 keystore path / pass / alias desde environment variables. El workflow:
 
-- Si el secret `ANDROID_KEYSTORE_BASE64` existe → lo decodifica y usa.
+- Si el secret `ANDROID_KEYSTORE_BASE64` existe → lo decodifica y usa
+  junto con `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, y
+  `ANDROID_KEY_PASSWORD`. **Desde v0.5.8 este es el camino
+  obligatorio** para todos los releases públicos — garantiza que todo
+  release comparte el mismo certificado, habilitando upgrades
+  in-place. Ver `docs/APK_SIGNING.md` para el runbook operativo.
 - Si no existe → genera un **CI-only keystore** con identidad
-  explícitamente **no-debug**:
+  explícitamente **no-debug** (este fallback está **deprecado desde
+  v0.5.8** y solo se mantiene para bootstrapping de emergencia):
 
   ```
   CN=Pickando Demo, OU=Engineering, O=enerBydev,
@@ -50,10 +60,23 @@ keystore path / pass / alias desde environment variables. El workflow:
   keyalg=RSA, keysize=4096, validity=10000 days
   ```
 
-- Firma con **v2 + v3** signing schemes (v1 JAR-signing omitido —
-  minSdk=24 no lo necesita). El step `Zipalign + sign APK with release
-  keystore` ejecuta `apksigner sign --v2-signing-enabled true
-  --v3-signing-enabled true`.
+  El step emite un `::warning::` annotation: *"No
+  ANDROID_KEYSTORE_BASE64 secret found ... Each build will be signed
+  with a different key, so users must uninstall previous versions
+  before installing a new one."* Cada build CI-only genera un
+  certificado DISTINTO, lo que produce
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` al hacer upgrade — este es
+  exactamente el bug de v0.5.5 → v0.5.6 → v0.5.7.
+
+- Firma con **v1 + v2 + v3** signing schemes. El step `Zipalign +
+  sign APK with release keystore` ejecuta `apksigner sign
+  --v2-signing-enabled true --v3-signing-enabled true` sin pasar
+  `--v1-signing-enabled false`, por lo que v1 (JAR signing) queda
+  habilitado al valor por defecto de `apksigner` (true). El resultado
+  neto es un APK firmado con los tres esquemas, maximizando la
+  compatibilidad con instaladores OEM y versiones antiguas de
+  Android. La verificación post-build confirma los tres con
+  `apksigner verify --verbose`.
 
 ### 2. `versionCode` derivado del git tag
 
@@ -118,9 +141,24 @@ futura, el secret será obligatorio.
 
 ### C: Firmar con v1 (JAR signing) además de v2 + v3
 
-Rechazado: v1 JAR-signing solo es necesario para minSdk < 24 (Android
-6.x y anteriores). Nuestro minSdk=24 (Android 7.0+). Firmar con v1
-añade overhead de signing y un punto de fallo adicional sin beneficio.
+**Amend v0.5.8 — esta alternativa fue revertida.** El análisis original
+asumía que omitir `--v1-signing-enabled` desactivaba v1. En realidad,
+`apksigner` habilita v1 por defecto, y el workflow nunca pasa
+`--v1-signing-enabled false`. El APK resultante está firmado con los
+**tres** esquemas (v1+v2+v3). Esto se confirma con `apksigner verify
+--verbose`:
+
+```
+Verifies
+Verified using v1 scheme (JAR signing): true
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+```
+
+Mantener v1 on-by-default es intencional: añade compatibilidad con
+instaladores OEM antiguos sin costo adicional (apksigner solo añade el
+bloque META-INF/*.SF/MF/RSA al APK). El overhead es despreciable (<2 KB
+en un APK de ~3 MB).
 
 ### D: Usar `bundletool` y subir AAB en lugar de APK
 
@@ -153,13 +191,19 @@ ligeras reduce el tiempo de CI.
   producción.
 
 ### Negativas
-- El secret `ANDROID_KEYSTORE_BASE64` no está configurado todavía, así
-  que cada release v0.5.4+ usa el keystore CI-only. Si Railway/GitHub
-  elimina el runner o el keystore CI-only se pierde, los releases
-  futuros no podrán upgrade-in-place sobre el APK v0.5.4 (cert
-  diferente → `INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Mitigación:
-  documentar en las release notes que el usuario debe desinstalar la
-  versión anterior antes de instalar la nueva si el cert cambia.
+- **Histórico (pre-v0.5.8):** el secret `ANDROID_KEYSTORE_BASE64` no
+  estaba configurado, así que cada release v0.5.4+ usaba el keystore
+  CI-only. Cada build generaba un certificado DISTINTO, lo que causó
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` al intentar upgrades
+  v0.5.5 → v0.5.6 → v0.5.7. Este es el incidente que motiva el amend
+  v0.5.8.
+- **Resuelto en v0.5.8:** el keystore persistente se agrega como
+  secret. El keystore CI-only queda DEPRECADO y solo se mantiene
+  como fallback de bootstrapping. Cualquier release público que
+  ejecute el fallback generará un `::warning::` visible en CI y
+  ROMPERÁ upgrades sobre releases previos al fallback. Los usuarios
+  que vengan de un release pre-v0.5.8 deben desinstalar antes de
+  instalar v0.5.8+ (ver `docs/APK_SIGNING.md`).
 - El step `apksigner verify` añade ~5 segundos al CI. Aceptable.
 - El versionCode deriva solo de MAJOR/MINOR/PATCH — no hay slot para
   build metadata. Si algún día se necesitan hotfix releases con el
@@ -178,22 +222,32 @@ ligeras reduce el tiempo de CI.
 - `.github/workflows/release.yml` job `build-android` incluye los
   cuatro checks post-build y hace `exit 1` si cualquiera falla.
 - `android/app/build.gradle` `signingConfigs.release` lee de env vars
-  (`KEYSTORE_PATH`, `KEYSTORE_PASS`, `KEY_ALIAS`, `KEY_PASS`).
+  (`KEYSTORE_PATH`, `KEYSTORE_PASS`, `KEY_ALIAS`, `KEY_PASS`) que el
+  workflow popula desde los secrets `ANDROID_KEYSTORE_BASE64`,
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+  `ANDROID_KEY_PASSWORD` (persistentes desde v0.5.8).
 - `android/app/src/main/AndroidManifest.xml` tiene
   `android:debuggable="false"` explícito.
 - El forensic re-audit del APK v0.5.4 (en
   `/home/z/my-project/worklog.md`, Task ID: 3, Phase D) confirma:
   - Signer DN: `CN=Pickando Demo, OU=Engineering, O=enerBydev, …`
-  - RSA 4096 bits, v2 + v3 signing
+  - RSA 4096 bits, **v1 + v2 + v3 signing** (corregido en amend
+    v0.5.8; el análisis original decía solo v2+v3, pero `apksigner`
+    habilita v1 por defecto y el workflow nunca lo desactiva).
   - `debuggable=0x0`, `usesCleartextTraffic=0x0`
   - 7 `mipmap/ic_launcher` + 7 `mipmap/ic_launcher_round`
   - `versionCode=504`, `versionName=0.5.4`
 - Para producir un release nuevo: taggear con `vX.Y.Z`, pushear el
   tag. El workflow genera el APK, firma, verifica, y publica el
   GitHub Release con el APK adjunto. No hay step manual de firma.
+- `docs/APK_SIGNING.md` es el runbook operativo para configurar los
+  4 secrets del keystore persistente. Es lectura obligatoria antes
+  del primer release post-v0.5.8.
 
 ## Referencias
 
+- `docs/APK_SIGNING.md` — runbook operativo para configurar el
+  keystore persistente vía GitHub Actions secrets (desde v0.5.8).
 - ADR-0004 — Android WebView wrapper (este ADR complementa el de
   packaging con el de signing).
 - `worklog.md` Task ID: 2 — análisis forense del APK v0.5.3.

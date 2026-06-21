@@ -482,8 +482,10 @@ jobs:
             2. Transfiérelo a tu dispositivo Android (7.0+)
             3. Habilita "Instalar apps de origen desconocido" en Ajustes
             4. Ábrelo con el gestor de archivos → Instalar
-            5. Si tienes una versión previa (v0.5.3 o anterior), **desinstálala primero**
-               (el certificado de firma cambió de debug a release)
+            5. Si tienes una versión previa (v0.5.7 o anterior), **desinstálala primero**
+               (cada release pre-v0.5.8 fue firmado con un certificado distinto).
+               A partir de v0.5.8, todos los releases usan el mismo keystore persistente
+               y se instalan como upgrade sin desinstalar. Ver docs/APK_SIGNING.md.
 
             La app carga la demo en vivo desde el deploy de Railway.
 
