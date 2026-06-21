@@ -9,6 +9,14 @@ on:
         description: 'Tag name (e.g. v0.1.0)'
         required: true
         default: 'v0.1.0'
+      allow_ephemeral_keystore:
+        description: 'Allow CI-only keystore (NOT recommended — APK will not upgrade-install). Set to true only for testing.'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 # Least-privilege permissions for the default GITHUB_TOKEN.
 # Release workflow needs `contents: write` to create GitHub Releases
@@ -301,30 +309,44 @@ jobs:
       - name: Decode release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret found. Generating a CI-only release keystore with NON-DEBUG identity. Each build will be signed with a different key, so users must uninstall previous versions before installing a new one. See docs/APK_SIGNING.md for permanent keystore setup."
-            # CRITICAL: this keystore must NOT use CN=Android Debug, because
-            # Android 14+ Play Protect refuses to install APKs signed with
-            # the debug cert on production devices.
-            keytool -genkeypair -v \
-              -keystore $HOME/ci-release.keystore \
-              -alias ci-release \
-              -keyalg RSA -keysize 4096 \
-              -validity 10000 \
-              -storepass changeit \
-              -keypass changeit \
-              -dname "CN=Pickando Demo, OU=Engineering, O=enerBydev, L=BuenosAires, ST=BuenosAires, C=AR"
-            echo "KEYSTORE_PATH=$HOME/ci-release.keystore" >> $GITHUB_ENV
-            echo "KEYSTORE_PASS=changeit" >> $GITHUB_ENV
-            echo "KEY_ALIAS=ci-release" >> $GITHUB_ENV
-            echo "KEY_PASS=changeit" >> $GITHUB_ENV
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is NOT set. Each release will be signed with a DIFFERENT cert, causing INSTALL_FAILED_UPDATE_INCOMPATIBLE on user upgrades. See docs/APK_SIGNING.md for setup instructions. To proceed anyway (NOT recommended for production releases), set ALLOW_EPHEMERAL_KEYSTORE=1 in the workflow run."
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.allow_ephemeral_keystore }}" = "true" ]; then
+              echo "::warning::ALLOW_EPHEMERAL_KEYSTONE=true — generating CI-only keystore. APK will NOT upgrade-install over previous versions."
+              keytool -genkeypair -v \
+                -keystore $HOME/ci-release.keystore \
+                -alias ci-release \
+                -keyalg RSA -keysize 4096 \
+                -validity 10000 \
+                -storepass changeit \
+                -keypass changeit \
+                -dname "CN=Pickando Demo, OU=Engineering, O=enerBydev, L=BuenosAires, ST=BuenosAires, C=AR"
+              echo "KEYSTORE_PATH=$HOME/ci-release.keystore" >> $GITHUB_ENV
+              echo "KEYSTORE_PASS=changeit" >> $GITHUB_ENV
+              echo "KEY_ALIAS=ci-release" >> $GITHUB_ENV
+              echo "KEY_PASS=changeit" >> $GITHUB_ENV
+            else
+              exit 1
+            fi
           else
+            echo "[OK] Using persistent release keystore from ANDROID_KEYSTORE_BASE64 secret."
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > $HOME/release.keystore
+            # Verify keystore is readable with provided password
+            keytool -list -keystore $HOME/release.keystore -storepass "$ANDROID_KEYSTORE_PASSWORD" > /dev/null 2>&1 || {
+              echo "::error::Keystore password is wrong OR keystore is corrupt. Verify ANDROID_KEYSTORE_PASSWORD secret."
+              exit 1
+            }
             echo "KEYSTORE_PATH=$HOME/release.keystore" >> $GITHUB_ENV
-            echo "KEYSTORE_PASS=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-            echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
-            echo "KEY_PASS=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEYSTORE_PASS=$ANDROID_KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "KEY_ALIAS=$ANDROID_KEY_ALIAS" >> $GITHUB_ENV
+            echo "KEY_PASS=$ANDROID_KEY_PASSWORD" >> $GITHUB_ENV
+            # Print cert SHA256 for traceability (matches what users see when verifying)
+            echo "=== Persistent keystore cert fingerprint ==="
+            keytool -list -v -keystore $HOME/release.keystore -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>&1 | grep -E "SHA256|Owner|Alias"
           fi
 
       - name: Zipalign + sign APK with release keystore
@@ -333,12 +355,13 @@ jobs:
         run: |
           # Zipalign with 4-byte boundary (required for APK Signature Scheme v2+)
           $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 pickando-demo.apk pickando-demo-aligned.apk
-          # Sign with apksigner using v2+v3 schemes
+          # Sign with apksigner using v1+v2+v3 schemes (v1 explicit even though default-on)
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
             --ks "$KEYSTORE_PATH" \
             --ks-pass pass:"$KEYSTORE_PASS" \
             --ks-key-alias "$KEY_ALIAS" \
             --key-pass pass:"$KEY_PASS" \
+            --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
             --out pickando-demo-signed.apk \
@@ -346,6 +369,16 @@ jobs:
           # Final name
           mv pickando-demo-signed.apk pickando-demo.apk
           ls -la pickando-demo.apk
+
+      - name: Print final APK signing cert (for cross-release verification)
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          echo "=== Final APK signing certificate ==="
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs pickando-demo.apk | grep -E "SHA-256|Signer|certificate DN"
+          echo
+          echo "=== Compare this SHA-256 with previous releases to verify keystore persistence ==="
+          echo "If the SHA-256 changes between releases, users will see INSTALL_FAILED_UPDATE_INCOMPATIBLE."
 
       - name: Verify APK signing (NO debug cert, NOT debuggable)
         env:
