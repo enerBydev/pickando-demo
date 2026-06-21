@@ -69,12 +69,18 @@ pub fn haversine_km(lat1: f64, lng1: f64, lat2: f64, lng2: f64) -> f64 {
 
 /// Find routes that match a passenger's location within a given radius.
 ///
-/// Uses geohash prefix matching for initial filtering, then refines with
-/// haversine distance calculation. Only routes with `Published` status
-/// and at least one available seat are considered.
+/// This is the simple entry point: it delegates to
+/// [`find_matching_routes_with_request`] with a permissive default
+/// [`MatchRequest`] (no explicit passenger bearing, no time window).
 ///
-/// The `request` carries optional `passenger_bearing_deg` and
-/// `time_window_minutes` for richer matching.
+/// Only routes with `Published` status and at least one available seat
+/// are considered. Because no bearing or departure time is supplied, the
+/// direction and time components fall back to permissive defaults
+/// (see [`compute_direction_similarity`] and the time branch in
+/// [`find_matching_routes_with_request`]).
+///
+/// Callers that want richer matching (same-direction reward, time-window
+/// penalty) should use [`find_matching_routes_with_request`] directly.
 pub fn find_matching_routes(
     passenger_lat: f64,
     passenger_lng: f64,
@@ -88,46 +94,31 @@ pub fn find_matching_routes(
     // benefit while compromising correctness. The two-layer design is preserved in
     // the geohash column of each Route for future neighbor-expansion optimization.
 
-    let mut matches: Vec<MatchResult> = routes
-        .iter()
-        .filter(|r| r.is_bookable())
-        .filter_map(|route| {
-            let distance =
-                haversine_km(passenger_lat, passenger_lng, route.origin_lat, route.origin_lng);
-
-            if distance > radius_km {
-                return None;
-            }
-
-            let direction_similarity =
-                compute_direction_similarity(route, passenger_lat, passenger_lng);
-            let time_compatibility = compute_time_compatibility(route);
-
-            let relevance_score =
-                compute_relevance(distance, radius_km, direction_similarity, time_compatibility);
-
-            Some(MatchResult {
-                route: route.clone(),
-                distance_km: round_to(distance, 2),
-                direction_similarity: round_to(direction_similarity, 3),
-                time_compatibility: round_to(time_compatibility, 3),
-                relevance_score: round_to(relevance_score, 3),
-            })
-        })
-        .collect();
-
-    // Sort by relevance descending (best match first)
-    matches.sort_by(|a, b| {
-        b.relevance_score
-            .partial_cmp(&a.relevance_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
-    matches
+    // Delegate to the full request-based path so both entry points share
+    // identical direction/time logic. With `passenger_bearing_deg = None`
+    // and `passenger_departure_time = None`, the full path uses the same
+    // permissive defaults this function historically applied inline.
+    let request = MatchRequest {
+        lat: passenger_lat,
+        lng: passenger_lng,
+        radius_km: Some(radius_km),
+        passenger_bearing_deg: None,
+        time_window_minutes: None,
+        passenger_departure_time: None,
+    };
+    find_matching_routes_with_request(&request, routes)
 }
 
 /// Variant of [`find_matching_routes`] that uses a full [`MatchRequest`]
 /// for richer direction and time matching.
+///
+/// Scoring weights: 0.5 distance + 0.3 direction + 0.2 time.
+///
+/// Direction weight (0.3) is intentionally moderate — for a demo, the
+/// distance dominates because passengers can adjust their pickup point
+/// by walking. For a production system where same-direction matters
+/// more (e.g., long-haul carpooling), increase to 0.4-0.5 and reduce
+/// distance to 0.3-0.4. Tune via A/B test against booking conversion.
 pub fn find_matching_routes_with_request(
     request: &MatchRequest,
     routes: &[Route],
@@ -157,7 +148,7 @@ pub fn find_matching_routes_with_request(
                     Some(rb) => bearing_similarity_deg(pb, rb),
                     None => 0.0, // no opinion if route has no direction
                 },
-                None => compute_direction_similarity(route, req.lat, req.lng),
+                None => compute_direction_similarity(route),
             };
 
             let time_compatibility = match passenger_departure_ms {
@@ -165,9 +156,14 @@ pub fn find_matching_routes_with_request(
                     let route_ms = crate::models::parse_time_to_ms(&route.departure_time);
                     match route_ms {
                         Some(route_ms) => {
-                            let diff_min = ((route_ms as i64 - passenger_ms as i64) / 60_000).abs();
-                            if diff_min <= time_window {
-                                1.0 - (diff_min as f64 / time_window as f64)
+                            // Float division preserves sub-minute precision (e.g.
+                            // 90s diff → 1.5 min, not 1 min truncated). Smoother
+                            // scoring at minute boundaries.
+                            let diff_min =
+                                ((route_ms as i64 - passenger_ms as i64).abs() as f64) / 60_000.0;
+                            let window_min = time_window as f64;
+                            if diff_min <= window_min {
+                                1.0 - (diff_min / window_min)
                             } else {
                                 0.0
                             }
@@ -200,28 +196,27 @@ pub fn find_matching_routes_with_request(
     matches
 }
 
-/// Compute direction similarity in `[-1, 1]` from the passenger's
-/// position to the route's bearing.
+/// Permissive direction similarity in `[-1, 1]` used when the passenger
+/// has NOT supplied an explicit bearing.
 ///
-/// If the passenger has no explicit bearing, we approximate by treating
-/// the passenger's "intended direction" as the same as the route's bearing.
-/// In that case, similarity is always `1.0` (permissive default).
+/// This is NOT a true cosine — without the passenger's intended direction
+/// we cannot compute an angular difference. Instead, we reward any route
+/// that has a clear origin→destination vector (i.e. its origin !=
+/// destination) with `1.0`, and return `0.0` for degenerate point-routes.
+/// This is a permissive default that preserves the historical behavior of
+/// [`find_matching_routes`] (simple path) and is also used by
+/// [`find_matching_routes_with_request`] when `passenger_bearing_deg` is
+/// `None`.
 ///
-/// When a passenger bearing is supplied, the cosine of the angular
-/// difference is returned.
-fn compute_direction_similarity(route: &Route, _passenger_lat: f64, _passenger_lng: f64) -> f64 {
-    // Without an explicit passenger bearing, we reward any route that
-    // *has* a clear direction (i.e. its origin != destination).
+/// When a passenger bearing IS supplied, the caller uses
+/// [`bearing_similarity_deg`] directly — see the direction branch in
+/// [`find_matching_routes_with_request`].
+fn compute_direction_similarity(route: &Route) -> f64 {
+    // Permissive default: reward any route with a clear direction.
     match route.bearing_deg() {
         Some(_) => 1.0,
         None => 0.0,
     }
-}
-
-/// Time compatibility in `[0, 1]` when the passenger provides no time.
-/// Defaults to `1.0` (permissive).
-fn compute_time_compatibility(_route: &Route) -> f64 {
-    1.0
 }
 
 /// Weighted blend of distance, direction, and time into a relevance score.
@@ -343,6 +338,17 @@ mod tests {
         let bc = haversine_km(b.0, b.1, c.0, c.1);
         let ac = haversine_km(a.0, a.1, c.0, c.1);
         assert!(ac <= ab + bc + 1e-6, "triangle inequality violated: ac={ac}, ab+bc={}", ab + bc);
+    }
+
+    #[test]
+    fn haversine_cdmx_to_guadalajara_approx_460km() {
+        // Known Mexico-scale reference distance — documents the haversine
+        // correctness at the ~500 km range. CDMX Zócalo to Guadalajara
+        // Centro is ~460 km by road; great-circle is slightly shorter.
+        let cdmx = (19.4326, -99.1332);
+        let gdl = (20.6597, -103.3496);
+        let d = haversine_km(cdmx.0, cdmx.1, gdl.0, gdl.1);
+        assert!(d > 450.0 && d < 470.0, "CDMX→GDL should be ~460km, got {d}");
     }
 
     // ----- find_matching_routes -----

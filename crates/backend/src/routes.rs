@@ -495,6 +495,19 @@ pub async fn find_matches(
         }
     }
 
+    // Validate time_window_minutes explicitly (do NOT silently clamp).
+    // MatchRequest::sanitized() clamps to [1, 480] for safety, but the
+    // handler rejects out-of-range values up-front so the client gets a
+    // clear error instead of a silently-rewritten window.
+    if let Some(tw) = body.time_window_minutes {
+        if !(1..=480).contains(&tw) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("time_window_minutes must be in [1, 480], got {tw}"),
+            ));
+        }
+    }
+
     let req = body.clone().sanitized();
     let lat = req.lat;
     let lng = req.lng;
@@ -943,6 +956,61 @@ mod tests {
             radius_km: Some(1000.0),
             passenger_bearing_deg: None,
             time_window_minutes: None,
+            passenger_departure_time: None,
+        };
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_zero_time_window() {
+        // time_window_minutes must be in [1, 480] — 0 is below the floor.
+        let state = test_state();
+        let req = MatchRequest {
+            lat: 19.4326,
+            lng: -99.1332,
+            radius_km: Some(5.0),
+            passenger_bearing_deg: None,
+            time_window_minutes: Some(0),
+            passenger_departure_time: None,
+        };
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_huge_time_window() {
+        // time_window_minutes must be in [1, 480] — 481 is above the ceiling.
+        let state = test_state();
+        let req = MatchRequest {
+            lat: 19.4326,
+            lng: -99.1332,
+            radius_km: Some(5.0),
+            passenger_bearing_deg: None,
+            time_window_minutes: Some(481),
+            passenger_departure_time: None,
+        };
+        let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn find_matches_rejects_negative_time_window() {
+        // Negative time_window_minutes is semantically invalid even though
+        // it deserializes fine as i64 — handler must reject, not clamp.
+        let state = test_state();
+        let req = MatchRequest {
+            lat: 19.4326,
+            lng: -99.1332,
+            radius_km: Some(5.0),
+            passenger_bearing_deg: None,
+            time_window_minutes: Some(-30),
             passenger_departure_time: None,
         };
         let result = find_matches(State(state), Json(serde_json::to_value(&req).unwrap())).await;
