@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::{routing::get, routing::post, Router};
 use pickando_shared::matching::encode_geohash;
 use pickando_shared::models::Route;
@@ -6,6 +7,7 @@ use std::time::Instant;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -21,13 +23,23 @@ use state::AppState;
 async fn main() {
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::fmt()
+    // Initialize tracing. If `RUST_LOG_JSON=1` is set in the environment
+    // (e.g. via Railway vars), emit structured JSON logs suitable for log
+    // aggregators like Axiom, Logtail, or Grafana Cloud. Otherwise, emit
+    // human-readable pretty logs for local dev.
+    // (SRE audit 8-c quick win #1; the `json` feature is already enabled in
+    // the workspace tracing-subscriber dependency.)
+    let subscriber = tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("pickando=info,tower_http=info")),
         )
-        .with_target(false)
-        .init();
+        .with_target(false);
+    if std::env::var("RUST_LOG_JSON").ok().as_deref() == Some("1") {
+        subscriber.json().init();
+    } else {
+        subscriber.init();
+    }
 
     let start_time = Instant::now();
 
@@ -68,12 +80,20 @@ async fn main() {
         .with_state(state.clone());
 
     // Static file server with SPA fallback.
-    // ServeDir::not_found_service makes any non-asset path return index.html,
-    // so the frontend router can handle deep links like /passenger or /driver.
+    //
+    // `ServeDir::fallback` (NOT `not_found_service`) is used so that the
+    // fallback's own status code is preserved. `ServeFile::new("static/index.html")`
+    // returns `200 OK` when the file exists, which is what we want for SPA deep
+    // links like `/m/`, `/app`, `/app/passenger`. Using `not_found_service` here
+    // would wrap the fallback with `SetStatus(NOT_FOUND)` and override the 200,
+    // causing the deployed app to return `404` for those routes (the body would
+    // still be `index.html`, so WebView renders fine, but HTTP crawlers/SEO
+    // tooling and Playwright-based monitoring would report 404). See worklog
+    // Task 8-c finding #1 and Task apk-audit-v0.5.3 row 8-11.
     let spa_fallback = ServeFile::new("static/index.html");
     let static_service = ServeDir::new("static")
         .append_index_html_on_directories(true)
-        .not_found_service(spa_fallback);
+        .fallback(spa_fallback);
 
     // CORS: restrict to known origins in production, permissive in dev.
     // In production, only the demo's own origin should be allowed to make
@@ -86,9 +106,7 @@ async fn main() {
     // - X-Frame-Options: DENY → prevents clickjacking
     // - Referrer-Policy → limits referrer leakage
     // - Permissions-Policy → disables risky browser APIs
-    use axum::extract::DefaultBodyLimit;
     use axum::http::{header, HeaderValue};
-    use tower_http::set_header::SetResponseHeaderLayer;
 
     let app = Router::new()
         .merge(api_routes)
@@ -117,8 +135,11 @@ async fn main() {
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
             "content-security-policy".parse().unwrap(),
-            // CSP: only allow resources from same origin + Google Fonts (for Inter
-            // and JetBrains Mono) + data: URLs (for inline SVG).
+            // Build CSP at runtime so connect-src can be tightened in production
+            // (only the production wss:// host is allowed) while staying
+            // permissive in dev mode (ws://localhost:* and ws://127.0.0.1:*
+            // for local frontend hot-reload + curl-based WS smoke tests).
+            // (Security audit 8-a P2 / A05.)
             //
             // CRITICAL: `script-src 'wasm-unsafe-eval'` is REQUIRED for Dioxus to
             // compile/instantiate its WASM bundle. Without it, Chrome/Firefox throw
@@ -132,17 +153,7 @@ async fn main() {
             //
             // 'unsafe-inline' on style-src is required because Dioxus injects inline
             // style attributes on elements (e.g., `style="color: var(--ink)"`).
-            HeaderValue::from_static(
-                "default-src 'self'; \
-                 script-src 'self' 'wasm-unsafe-eval'; \
-                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
-                 font-src 'self' https://fonts.gstatic.com data:; \
-                 img-src 'self' data: https:; \
-                 connect-src 'self' ws: wss:; \
-                 frame-ancestors 'none'; \
-                 base-uri 'self'; \
-                 form-action 'self'",
-            ),
+            csp_value(),
         ))
         .layer(SetResponseHeaderLayer::if_not_present(
             // HSTS: only meaningful over HTTPS, but we set it on all responses.
@@ -329,6 +340,55 @@ pub fn init_sample_routes() -> Vec<Route> {
 // Security middleware builders
 // ===========================================================================
 
+/// Allow-list of origins permitted in production for cross-origin requests
+/// (CORS) and WebSocket upgrades.
+///
+/// Reused by `build_cors_layer` (for HTTP CORS) and `ws::is_origin_allowed`
+/// (for WebSocket Origin validation). Keeping both checks against the same
+/// list prevents drift: a host allowed for XHR fetch is also allowed for WS,
+/// and vice versa. (Security audit 8-a P2 / A01.)
+pub(crate) const ALLOWED_ORIGINS: &[&str] = &[
+    "https://pickando-demo-production.up.railway.app",
+    "https://pickando-demo.up.railway.app",
+];
+
+/// Build the Content-Security-Policy header value at runtime.
+///
+/// The policy is identical in dev and prod EXCEPT for `connect-src`:
+/// - Production: `connect-src 'self' wss://pickando-demo-production.up.railway.app`
+///   (the only WS host the demo needs; previously was the wide-open
+///   `connect-src 'self' ws: wss:` which allowed WS egress to ANY host —
+///   Security audit 8-a P2 / A05).
+/// - Dev (`PICKANDO_DEV=1`): `connect-src 'self' ws: wss:` is kept
+///   permissive so local frontend hot-reload and curl-based WS smoke
+///   tests against `ws://localhost:*` and `ws://127.0.0.1:*` work
+///   without enumeration.
+///
+/// `script-src 'wasm-unsafe-eval'` is REQUIRED for Dioxus (see inline
+/// comment at the call site). 'unsafe-inline' on style-src is required
+/// because Dioxus injects inline style attributes.
+fn csp_value() -> axum::http::HeaderValue {
+    use axum::http::HeaderValue;
+    let is_dev = std::env::var("PICKANDO_DEV").unwrap_or_default() == "1";
+    let connect_src = if is_dev {
+        "connect-src 'self' ws: wss:"
+    } else {
+        "connect-src 'self' wss://pickando-demo-production.up.railway.app"
+    };
+    let csp = format!(
+        "default-src 'self'; \
+         script-src 'self' 'wasm-unsafe-eval'; \
+         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+         font-src 'self' https://fonts.gstatic.com data:; \
+         img-src 'self' data: https:; \
+         {connect_src}; \
+         frame-ancestors 'none'; \
+         base-uri 'self'; \
+         form-action 'self'"
+    );
+    HeaderValue::from_str(&csp).expect("CSP header value must be valid ASCII")
+}
+
 /// Build a CORS layer that allows only known origins.
 ///
 /// In production, only the demo's own origin is allowed. In development
@@ -362,12 +422,8 @@ fn build_cors_layer() -> CorsLayer {
             .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
             .allow_credentials(false)
     } else {
-        // Production: allow only the demo's own origin
-        let allowed_origins = [
-            "https://pickando-demo-production.up.railway.app",
-            "https://pickando-demo.up.railway.app",
-        ];
-        let origins: Vec<HeaderValue> = allowed_origins
+        // Production: allow only the demo's own origin (see ALLOWED_ORIGINS).
+        let origins: Vec<HeaderValue> = ALLOWED_ORIGINS
             .iter()
             .filter_map(|o| o.parse().ok())
             .collect();

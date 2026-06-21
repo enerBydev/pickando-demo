@@ -222,7 +222,12 @@ pub async fn create_route(
     }
 
     let body: CreateRouteRequest = serde_json::from_value(value).map_err(|e| {
-        (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid CreateRouteRequest: {e}"))
+        // Log the full serde error server-side; return a generic message to the
+        // client to avoid leaking internal struct field names (Security audit 8-a
+        // P3 / A07). The response shape stays (StatusCode, String) so the JSON
+        // body is still {"error": "..."}.
+        tracing::warn!("serde error parsing CreateRouteRequest: {e}");
+        (StatusCode::UNPROCESSABLE_ENTITY, "invalid request body".to_string())
     })?;
 
     tracing::info!(
@@ -361,7 +366,12 @@ pub async fn request_ride(
     }
 
     let body: CreateRideRequest = serde_json::from_value(value).map_err(|e| {
-        (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid CreateRideRequest: {e}"))
+        // Log the full serde error server-side; return a generic message to the
+        // client to avoid leaking internal struct field names (Security audit 8-a
+        // P3 / A07). The response shape stays (StatusCode, String) so the JSON
+        // body is still {"error": "..."}.
+        tracing::warn!("serde error parsing CreateRideRequest: {e}");
+        (StatusCode::UNPROCESSABLE_ENTITY, "invalid request body".to_string())
     })?;
 
     // Validate body
@@ -456,8 +466,14 @@ pub async fn find_matches(
         ));
     }
 
-    let body: MatchRequest = serde_json::from_value(value)
-        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, format!("invalid MatchRequest: {e}")))?;
+    let body: MatchRequest = serde_json::from_value(value).map_err(|e| {
+        // Log the full serde error server-side; return a generic message to the
+        // client to avoid leaking internal struct field names (Security audit 8-a
+        // P3 / A07). The response shape stays (StatusCode, String) so the JSON
+        // body is still {"error": "..."}.
+        tracing::warn!("serde error parsing MatchRequest: {e}");
+        (StatusCode::UNPROCESSABLE_ENTITY, "invalid request body".to_string())
+    })?;
 
     // Validate radius_km explicitly (do NOT silently clamp invalid values)
     if let Some(r) = body.radius_km {
