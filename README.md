@@ -420,6 +420,12 @@ La app compila a 4+ plataformas desde un solo codebase:
 > que requiere NDK completo). Ver
 > [ADR-0004](docs/adr/0004-android-webview-wrapper.md).
 
+> ⚠️ **Upgrading from v0.5.7 or earlier?** Uninstall the old version
+> first. Each release before v0.5.8 was signed with a different
+> certificate, so Android refuses upgrade install. From v0.5.8 onwards,
+> all releases use the same persistent keystore and upgrade cleanly.
+> See [docs/APK_SIGNING.md](docs/APK_SIGNING.md) for details.
+
 ---
 
 ## Testing y calidad
