@@ -30,3 +30,6 @@ dist/
 *.tmp
 static/
 state.json
+
+# Keystore secrets (NEVER commit)
+secrets/
